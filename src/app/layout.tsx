@@ -1,16 +1,16 @@
 import type { Metadata } from 'next'
-import { Volkhov } from 'next/font/google'
+import { Inter } from 'next/font/google'
 import './globals.css'
-import { AOSInit } from './components/AOS'
+import Header from './components/Header'
+import Footer from './components/Footer'
+import { AuthProvider } from './context/AuthContext'
+import { Suspense } from 'react'
 
-const raleway = Volkhov({
-  subsets: ['latin'],
-  weight: '700'
-})
+const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'Jadoo',
-  description: 'A Travel Agency Landing Page',
+  title: '智慧海洋牧场可视化系统',
+  description: '智能化海洋养殖管理平台',
 }
 
 export default function RootLayout({
@@ -19,9 +19,18 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en">
-      <AOSInit />
-      <body className={raleway.className}>{children}</body>
+    <html lang="zh">
+      <body className={inter.className}>
+        <AuthProvider>
+          <Header />
+          <Suspense fallback={<div className="min-h-screen flex items-center justify-center">加载中...</div>}>
+            <main className="min-h-screen">
+              {children}
+            </main>
+          </Suspense>
+          <Footer />
+        </AuthProvider>
+      </body>
     </html>
   )
 }

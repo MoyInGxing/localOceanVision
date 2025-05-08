@@ -1,79 +1,190 @@
+'use client';
+
 import Link from "next/link";
 import Image from "next/image";
 import { IoMenu } from "react-icons/io5";
 import { IoClose } from "react-icons/io5";
 import { useState, useEffect } from 'react';
+import { useAuth } from '../context/AuthContext';
+import { useRouter } from 'next/navigation';
 
-const Header = () => {
-     // Manage header bg change on scroll
-     const [scrollY, setScrollY] = useState(0);
-     const [headerBackground, setHeaderBackground] = useState('');
- 
-     // Manage visibility of nav menu
-     const [isMenuOpen, setIsMenuOpen] = useState(false);
-   
-     // Update the scroll position state when the user scrolls
-     const handleScroll = () => {
-       setScrollY(window.scrollY);
-     };
-   
-     useEffect(() => {
-       // Add a scroll event listener and cleanup on component unmount
-       window.addEventListener('scroll', handleScroll);
-       return () => {
-         window.removeEventListener('scroll', handleScroll);
-       };
-     }, []);
-   
-     // Determine the background color based on the scroll position
-     useEffect(() => {
-       if (scrollY > 0) {
-         // Apply a backdrop blur background when scrolling
-         setHeaderBackground('bg-hotpink shadow-md');
-       } else {
-         // Remove the background color when at the top
-         setHeaderBackground('');
-       }
-     }, [scrollY]);
- 
+export default function Header() {
+    const [isScrolled, setIsScrolled] = useState(false);
+    const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+    const { isLoggedIn, logout, isAdmin } = useAuth();
+    const router = useRouter();
 
-    const toggleMenu = () => {
-        setIsMenuOpen(!isMenuOpen);
-      };
+    useEffect(() => {
+        const handleScroll = () => {
+            setIsScrolled(window.scrollY > 0);
+        };
 
-    return ( 
-        <nav className={`py-5 px-[5%] top-0 w-full fixed flex items-center justify-between z-20 ${headerBackground} special-font`}>
-            <Link href="/" className="w-[80px]">
-                <Image src="/img/hero-logo.png" width={80} height={80} alt="logo" className="w-full" loading="eager"/>
-            </Link>
+        window.addEventListener('scroll', handleScroll);
+        return () => window.removeEventListener('scroll', handleScroll);
+    }, []);
 
-            <section className={`${isMenuOpen ? 'left-0' : 'left-[-100%]'} nav-transition md:transition-none absolute top-[68px] md:top-0 md:left-0 md:relative md:flex flex-col md:flex-row items-start md:items-center justify-start md:justify-between gap-4 lg:gap-8 text-[16px] text-litedark font-bold bg-orange md:bg-transparent pl-[5%] md:pl-auto py-10 md:py-0 w-full md:w-auto`}>
-                <div className="flex flex-col md:flex-row items-start md:items-center justify-start md:justify-between gap-4 lg:gap-8">
-                    <a href="#destination" className="hover:text-white md:hover:text-orange transition delay-200" onClick={toggleMenu}>Destinations</a>
-                    <a href="#" className="hover:text-white md:hover:text-orange transition delay-200" onClick={toggleMenu}>Hotels</a>
-                    <a href="#" className="hover:text-white md:hover:text-orange transition delay-200" onClick={toggleMenu}>Flights</a>
-                    <a href="#bookings" className="hover:text-white md:hover:text-orange transition delay-200" onClick={toggleMenu}>Bookings</a>
+    const handleLogout = () => {
+        logout();
+        setIsMobileMenuOpen(false);
+        router.push('/login');
+    };
+
+    return (
+        <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${isScrolled ? 'bg-white shadow-md' : 'bg-transparent'}`}>
+            <div className="container mx-auto px-4">
+                <div className="flex items-center justify-between h-20">
+                    <Link href="/" className="flex items-center">
+                        <Image src="/img/logo.png" alt="Logo" width={40} height={40} className="rounded-lg" />
+                        <span className="ml-2 text-xl font-bold text-gray-900">智慧海洋牧场</span>
+                    </Link>
+
+                    {/* 桌面端导航 */}
+                    <nav className="hidden md:flex items-center space-x-8">
+                        <Link href="/dashboard" className="text-gray-700 hover:text-blue-600 transition-colors">
+                            主要信息
+                        </Link>
+                        <Link href="/underwater" className="text-gray-700 hover:text-blue-600 transition-colors">
+                            水下系统
+                        </Link>
+                        <Link href="/intelligence" className="text-gray-700 hover:text-blue-600 transition-colors">
+                            智能中心
+                        </Link>
+                        <Link href="/data-center" className="text-gray-700 hover:text-blue-600 transition-colors">
+                            数据中心
+                        </Link>
+                        {isAdmin && (
+                            <Link href="/admin" className="text-gray-700 hover:text-blue-600 transition-colors">
+                                管理控制台
+                            </Link>
+                        )}
+                    </nav>
+
+                    {/* 桌面端用户操作 */}
+                    <div className="hidden md:flex items-center space-x-4">
+                        {!isLoggedIn ? (
+                            <>
+                                <Link
+                                    href="/login"
+                                    className="px-4 py-2 text-gray-700 hover:text-blue-600 transition-colors"
+                                >
+                                    登录
+                                </Link>
+                                <Link
+                                    href="/register"
+                                    className="px-4 py-2 text-gray-700 hover:text-blue-600 transition-colors"
+                                >
+                                    注册
+                                </Link>
+                            </>
+                        ) : (
+                            <>
+                                <Link
+                                    href="/profile"
+                                    className="px-4 py-2 text-gray-700 hover:text-blue-600 transition-colors"
+                                >
+                                    个人中心
+                                </Link>
+                                <button
+                                    onClick={handleLogout}
+                                    className="px-4 py-2 text-gray-700 hover:text-blue-600 transition-colors"
+                                >
+                                    退出
+                                </button>
+                            </>
+                        )}
+                    </div>
+
+                    {/* 移动端菜单按钮 */}
+                    <button
+                        className="md:hidden text-gray-700"
+                        onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                    >
+                        {isMobileMenuOpen ? <IoClose size={24} /> : <IoMenu size={24} />}
+                    </button>
                 </div>
 
-                <div className="flex flex-col md:flex-row items-start md:items-center justify-start md:justify-between gap-4 lg:gap-8 mt-4 md:mt-0">
-                    <a href="#" className="hover:text-white md:hover:text-orange transition delay-200" onClick={toggleMenu}>Login</a>
-                    <a href="#" className="px-4 py-1 border border-litedark rounded-[4px] hover:bg-litedark hover:text-white transition delay-200" onClick={toggleMenu}>Sign up</a>
-
-                    <select name="" id="" className="bg-transparent border-none outline-none">
-                        <option value="">EN</option>
-                        <option value="">AR</option>
-                        <option value="">SP</option>
-                    </select>
-                </div>
-            </section>
-
-            {isMenuOpen ? 
-            <IoClose className="block md:hidden text-4xl text-orange font-bold cursor-pointer" onClick={toggleMenu}/>
-            :
-            <IoMenu className="block md:hidden text-4xl text-orange font-bold cursor-pointer" onClick={toggleMenu}/>
-            }
-        </nav>
-     );
+                {/* 移动端导航菜单 */}
+                {isMobileMenuOpen && (
+                    <div className="md:hidden py-4">
+                        <nav className="flex flex-col space-y-4">
+                            <Link
+                                href="/dashboard"
+                                className="text-gray-700 hover:text-blue-600 transition-colors"
+                                onClick={() => setIsMobileMenuOpen(false)}
+                            >
+                                主要信息
+                            </Link>
+                            <Link
+                                href="/underwater"
+                                className="text-gray-700 hover:text-blue-600 transition-colors"
+                                onClick={() => setIsMobileMenuOpen(false)}
+                            >
+                                水下系统
+                            </Link>
+                            <Link
+                                href="/intelligence"
+                                className="text-gray-700 hover:text-blue-600 transition-colors"
+                                onClick={() => setIsMobileMenuOpen(false)}
+                            >
+                                智能中心
+                            </Link>
+                            <Link
+                                href="/data-center"
+                                className="text-gray-700 hover:text-blue-600 transition-colors"
+                                onClick={() => setIsMobileMenuOpen(false)}
+                            >
+                                数据中心
+                            </Link>
+                            {isAdmin && (
+                                <Link
+                                    href="/admin"
+                                    className="text-gray-700 hover:text-blue-600 transition-colors"
+                                    onClick={() => setIsMobileMenuOpen(false)}
+                                >
+                                    管理控制台
+                                </Link>
+                            )}
+                            {!isLoggedIn ? (
+                                <>
+                                    <Link
+                                        href="/login"
+                                        className="text-gray-700 hover:text-blue-600 transition-colors"
+                                        onClick={() => setIsMobileMenuOpen(false)}
+                                    >
+                                        登录
+                                    </Link>
+                                    <Link
+                                        href="/register"
+                                        className="text-gray-700 hover:text-blue-600 transition-colors"
+                                        onClick={() => setIsMobileMenuOpen(false)}
+                                    >
+                                        注册
+                                    </Link>
+                                </>
+                            ) : (
+                                <>
+                                    <Link
+                                        href="/profile"
+                                        className="text-gray-700 hover:text-blue-600 transition-colors"
+                                        onClick={() => setIsMobileMenuOpen(false)}
+                                    >
+                                        个人中心
+                                    </Link>
+                                    <button
+                                        onClick={() => {
+                                            handleLogout();
+                                            setIsMobileMenuOpen(false);
+                                        }}
+                                        className="text-left text-gray-700 hover:text-blue-600 transition-colors"
+                                    >
+                                        退出
+                                    </button>
+                                </>
+                            )}
+                        </nav>
+                    </div>
+                )}
+            </div>
+        </header>
+    );
 }
- 
-export default Header;
