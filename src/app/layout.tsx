@@ -24,7 +24,7 @@ export default function RootLayout({
         <AuthProvider>
           <Header />
           <Suspense fallback={<div className="min-h-screen flex items-center justify-center">加载中...</div>}>
-            <main className="min-h-screen">
+            <main className="min-h-screen pt-20">
               {children}
             </main>
           </Suspense>

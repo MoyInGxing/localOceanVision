@@ -1,0 +1,27 @@
+{
+  "videos": [
+    {
+      "id": "video1",
+      "name": "水下鱼群活动 1",
+      "url": "/videos/3883897-hd_1920_1080_30fps.mp4",
+      "description": "高清水下鱼群活动视频",
+      "metadata": {
+        "duration": "30s",
+        "resolution": "1080p",
+        "frameRate": "30fps"
+      }
+    },
+    {
+      "id": "video2",
+      "name": "水下鱼群活动 2",
+      "url": "/videos/855798-hd_1920_1080_30fps.mp4",
+      "description": "高清水下鱼群活动视频",
+      "metadata": {
+        "duration": "30s",
+        "resolution": "1080p",
+        "frameRate": "30fps"
+      }
+    }
+  ],
+  "annotations": []
+}

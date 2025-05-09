@@ -3,10 +3,11 @@
 import { useState } from 'react';
 import ProtectedRoute from '../components/ProtectedRoute';
 import { FaPowerOff, FaVideo, FaThermometerHalf, FaTint } from 'react-icons/fa';
+import VideoAnalysis from '../components/VideoAnalysis';
 
 export default function Underwater() {
   const [devices, setDevices] = useState({
-    camera1: false,
+    camera1: true,
     camera2: false,
     feeder1: false,
     feeder2: false
@@ -24,6 +25,18 @@ export default function Underwater() {
       <main className="p-8">
         <div className="max-w-7xl mx-auto">
           <h1 className="text-3xl font-bold text-gray-900 mb-8">水下系统</h1>
+
+          {/* 视频分析区域 */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="bg-white p-6 rounded-lg shadow">
+              <h2 className="text-xl font-semibold mb-4">摄像头 1</h2>
+              <VideoAnalysis isActive={devices.camera1} cameraId={1} />
+            </div>
+            <div className="bg-white p-6 rounded-lg shadow">
+              <h2 className="text-xl font-semibold mb-4">摄像头 2</h2>
+              <VideoAnalysis isActive={devices.camera2} cameraId={2} />
+            </div>
+          </div>
 
           {/* 设备控制面板 */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">

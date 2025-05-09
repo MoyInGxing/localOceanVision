@@ -11,7 +11,8 @@ import {
   Title,
   Tooltip,
   Legend,
-  ChartData
+  ChartData,
+  ChartOptions
 } from 'chart.js';
 import ProtectedRoute from '../components/ProtectedRoute';
 
@@ -52,32 +53,125 @@ export default function Dashboard() {
       datasets: []
     }
   });
+  const [timeRange, setTimeRange] = useState(24); // 默认显示最近24小时
+
+  // 生成时间标签
+  const generateTimeLabels = (range: number) => {
+    const labels = [];
+    const now = new Date();
+    for (let i = range - 1; i >= 0; i--) {
+      const date = new Date(now);
+      date.setHours(date.getHours() - i);
+      labels.push(date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }));
+    }
+    return labels;
+  };
+
+  // 图表配置
+  const chartOptions: ChartOptions<'line'> = {
+    responsive: true,
+    maintainAspectRatio: false,
+    animation: {
+      duration: 0 // 禁用动画以提高性能
+    },
+    scales: {
+      x: {
+        ticks: {
+          maxRotation: 45,
+          minRotation: 45,
+          maxTicksLimit: 8, // 限制显示的刻度数量
+          font: {
+            size: 10
+          }
+        },
+        grid: {
+          display: false
+        }
+      },
+      y: {
+        beginAtZero: false,
+        ticks: {
+          precision: 1 // 保留一位小数
+        },
+        grid: {
+          color: 'rgba(0, 0, 0, 0.1)'
+        }
+      }
+    },
+    plugins: {
+      legend: {
+        display: false // 隐藏图例
+      },
+      tooltip: {
+        mode: 'index',
+        intersect: false,
+        callbacks: {
+          label: function(context: any) {
+            return `温度: ${context.raw.toFixed(1)}°C`;
+          }
+        }
+      }
+    },
+    interaction: {
+      mode: 'nearest' as const,
+      axis: 'x',
+      intersect: false
+    }
+  };
 
   // 模拟实时数据
   useEffect(() => {
-    const generateData = (): ChartData<'line'> => ({
-      labels: ['00:00', '04:00', '08:00', '12:00', '16:00', '20:00'],
-      datasets: [
-        {
-          label: '温度 (°C)',
-          data: Array.from({ length: 6 }, () => Math.random() * 10 + 20),
-          borderColor: 'rgb(255, 99, 132)',
-          tension: 0.1
-        }
-      ]
-    });
+    const generateData = (): ChartData<'line'> => {
+      const labels = generateTimeLabels(timeRange);
+      const data = Array.from({ length: timeRange }, () => Math.random() * 10 + 20);
+      
+      // 使用移动平均平滑数据
+      const smoothedData = data.map((_, index) => {
+        const start = Math.max(0, index - 2);
+        const end = Math.min(data.length, index + 3);
+        const slice = data.slice(start, end);
+        return slice.reduce((a, b) => a + b, 0) / slice.length;
+      });
+
+      return {
+        labels,
+        datasets: [
+          {
+            label: '温度 (°C)',
+            data: smoothedData,
+            borderColor: 'rgb(255, 99, 132)',
+            tension: 0.4,
+            fill: false,
+            pointRadius: 2,
+            pointHoverRadius: 5
+          }
+        ]
+      };
+    };
 
     setEnvironmentData(prev => ({
       ...prev,
       temperature: generateData()
     }));
-  }, []);
+  }, [timeRange]);
 
   return (
     <ProtectedRoute>
       <main className="p-8">
         <div className="max-w-7xl mx-auto">
-          <h1 className="text-3xl font-bold text-gray-900 mb-8">主要信息</h1>
+          <div className="flex justify-between items-center mb-8">
+            <h1 className="text-3xl font-bold text-gray-900">主要信息</h1>
+            <select
+              className="px-4 py-2 border border-gray-300 rounded-lg"
+              value={timeRange}
+              onChange={(e) => setTimeRange(Number(e.target.value))}
+            >
+              <option value="6">最近6小时</option>
+              <option value="12">最近12小时</option>
+              <option value="24">最近24小时</option>
+              <option value="48">最近48小时</option>
+            </select>
+          </div>
           
           {/* 实时监控卡片 */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
@@ -92,19 +186,7 @@ export default function Dashboard() {
             <h2 className="text-xl font-semibold mb-4">温度趋势</h2>
             {environmentData.temperature.datasets && (
               <div className="h-[400px]">
-                <Line data={environmentData.temperature} options={{
-                  responsive: true,
-                  maintainAspectRatio: false,
-                  plugins: {
-                    legend: {
-                      position: 'top' as const,
-                    },
-                    title: {
-                      display: true,
-                      text: '24小时温度变化'
-                    }
-                  }
-                }} />
+                <Line data={environmentData.temperature} options={chartOptions} />
               </div>
             )}
           </div>

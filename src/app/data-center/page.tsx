@@ -32,14 +32,27 @@ ChartJS.register(
 export default function DataCenter() {
   const [dateRange, setDateRange] = useState('week');
   const [selectedMetric, setSelectedMetric] = useState('temperature');
+  const [timeRange, setTimeRange] = useState(7); // 默认显示最近7天
+
+  // 生成时间标签
+  const generateTimeLabels = (range: number) => {
+    const labels = [];
+    const now = new Date();
+    for (let i = range - 1; i >= 0; i--) {
+      const date = new Date(now);
+      date.setDate(date.getDate() - i);
+      labels.push(date.toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' }));
+    }
+    return labels;
+  };
 
   // 模拟数据
   const temperatureData: ChartData<'line'> = {
-    labels: ['周一', '周二', '周三', '周四', '周五', '周六', '周日'],
+    labels: generateTimeLabels(timeRange),
     datasets: [
       {
         label: '水温 (°C)',
-        data: [22, 23, 22.5, 23.5, 24, 23.8, 23.2],
+        data: Array.from({ length: timeRange }, () => Math.random() * 10 + 20),
         borderColor: 'rgb(75, 192, 192)',
         tension: 0.1
       }
@@ -47,14 +60,36 @@ export default function DataCenter() {
   };
 
   const productionData: ChartData<'bar'> = {
-    labels: ['1月', '2月', '3月', '4月', '5月', '6月'],
+    labels: generateTimeLabels(timeRange),
     datasets: [
       {
         label: '产量 (吨)',
-        data: [65, 59, 80, 81, 56, 85],
+        data: Array.from({ length: timeRange }, () => Math.random() * 30 + 50),
         backgroundColor: 'rgba(54, 162, 235, 0.5)'
       }
     ]
+  };
+
+  // 图表配置
+  const chartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    scales: {
+      x: {
+        ticks: {
+          maxRotation: 45,
+          minRotation: 45
+        }
+      },
+      y: {
+        beginAtZero: false
+      }
+    },
+    plugins: {
+      legend: {
+        position: 'top' as const,
+      }
+    }
   };
 
   return (
@@ -77,7 +112,7 @@ export default function DataCenter() {
 
           {/* 数据筛选器 */}
           <div className="bg-white p-6 rounded-lg shadow-lg mb-8">
-            <div className="flex flex-wrap gap-4">
+            <div className="flex gap-4 items-center">
               <select
                 className="px-4 py-2 border border-gray-300 rounded-lg"
                 value={dateRange}
@@ -98,6 +133,16 @@ export default function DataCenter() {
                 <option value="ph">pH值</option>
                 <option value="production">产量</option>
               </select>
+              <select
+                className="px-4 py-2 border border-gray-300 rounded-lg"
+                value={timeRange}
+                onChange={(e) => setTimeRange(Number(e.target.value))}
+              >
+                <option value="3">最近3天</option>
+                <option value="7">最近7天</option>
+                <option value="14">最近14天</option>
+                <option value="30">最近30天</option>
+              </select>
               <div className="flex-1">
                 <div className="relative">
                   <input
@@ -112,14 +157,18 @@ export default function DataCenter() {
           </div>
 
           {/* 图表区域 */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div className="bg-white p-6 rounded-lg shadow-lg">
               <h2 className="text-xl font-semibold mb-6">水温趋势</h2>
-              <Line data={temperatureData} />
+              <div className="h-[400px]">
+                <Line data={temperatureData} options={chartOptions} />
+              </div>
             </div>
             <div className="bg-white p-6 rounded-lg shadow-lg">
               <h2 className="text-xl font-semibold mb-6">产量统计</h2>
-              <Bar data={productionData} />
+              <div className="h-[400px]">
+                <Bar data={productionData} options={chartOptions} />
+              </div>
             </div>
           </div>
 

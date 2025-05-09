@@ -14,6 +14,7 @@ interface AuthContextType {
     user: User | null;
     isLoggedIn: boolean;
     isAdmin: boolean;
+    isLoading: boolean;
     login: (username: string, password: string) => Promise<void>;
     register: (username: string, password: string, email: string, phone: string) => Promise<void>;
     logout: () => void;
@@ -34,13 +35,41 @@ export { useAuth };
 
 export function AuthProvider({ children }: { children: ReactNode }) {
     const [user, setUser] = useState<User | null>(null);
+    const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
-        // 从 localStorage 恢复用户会话
-        const storedUser = localStorage.getItem('user');
-        if (storedUser) {
-            setUser(JSON.parse(storedUser));
-        }
+        const validateSession = async () => {
+            try {
+                const storedUser = localStorage.getItem('user');
+                if (storedUser) {
+                    const userData = JSON.parse(storedUser);
+                    // 验证会话是否有效
+                    const response = await fetch('/api/auth/validate', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ userId: userData.id }),
+                    });
+
+                    if (response.ok) {
+                        setUser(userData);
+                    } else {
+                        // 如果会话无效，清除存储的用户信息
+                        localStorage.removeItem('user');
+                        setUser(null);
+                    }
+                }
+            } catch (error) {
+                console.error('会话验证失败:', error);
+                localStorage.removeItem('user');
+                setUser(null);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        validateSession();
     }, []);
 
     const login = async (username: string, password: string) => {
@@ -108,11 +137,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         user,
         isLoggedIn: !!user,
         isAdmin: user?.role === 'admin',
+        isLoading,
         login,
         register,
         logout,
         updateUser
     };
+
+    if (isLoading) {
+        return <div className="min-h-screen flex items-center justify-center">加载中...</div>;
+    }
 
     return (
         <AuthContext.Provider value={value}>
