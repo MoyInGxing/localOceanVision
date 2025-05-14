@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import ProtectedRoute from '../components/ProtectedRoute'; // 假设此组件存在于您的项目中
-import { FaBrain, FaChartLine, FaRobot, FaClipboardCheck, FaTimes } from 'react-icons/fa';
+import { FaBrain, FaChartLine, FaRobot, FaClipboardCheck, FaTimes, FaLightbulb } from 'react-icons/fa'; // Added FaLightbulb
 import { FiSun, FiCloud, FiCloudRain, FiCloudDrizzle, FiWind, FiThermometer } from 'react-icons/fi'; // 天气图标
 import { Line, Bar } from 'react-chartjs-2';
 import {
@@ -43,6 +43,15 @@ interface WeatherData {
 // 定义分析类型
 type AnalysisType = 'growth' | 'disease' | 'feeding' | 'environment';
 
+// 定义图表数据和建议的接口
+interface AnalysisChartInfo {
+  data: ChartData<'line'> | ChartData<'bar'>;
+  type: 'line' | 'bar';
+  title: string;
+  adviceText: string; // 新增建议文本字段
+}
+
+
 export default function Intelligence() {
   const [selectedAnalysis, setSelectedAnalysis] = useState<AnalysisType | null>(null);
   const [weatherForecast, setWeatherForecast] = useState<WeatherData[]>([]);
@@ -80,7 +89,7 @@ export default function Intelligence() {
         labels: {
           color: '#4A5568', // text-gray-700
           font: {
-            size: 14,
+            size: 12, // Adjusted font size for more labels
           }
         }
       },
@@ -105,8 +114,8 @@ export default function Intelligence() {
     }
   };
 
-  // 模拟图表数据
-  const analysisChartData: Record<AnalysisType, { data: ChartData<'line'> | ChartData<'bar'>, type: 'line' | 'bar', title: string }> = {
+  // 模拟图表数据和建议
+  const analysisChartData: Record<AnalysisType, AnalysisChartInfo> = {
     growth: {
       type: 'line',
       title: '生长预测趋势',
@@ -122,6 +131,7 @@ export default function Intelligence() {
           },
         ],
       },
+      adviceText: '根据当前生长曲线，预计未来几周生长态势良好。建议保持现有饲料配方和投喂量，并密切关注水质变化，确保溶氧充足。可考虑在第4周后适当增加高蛋白饲料比例，以促进快速增重。',
     },
     disease: {
       type: 'bar',
@@ -148,6 +158,7 @@ export default function Intelligence() {
           },
         ],
       },
+      adviceText: '当前弧菌病和烂鳃病风险较高。建议加强水体消毒，每周使用1-2次益生菌调节水质。密切观察鱼群活动和摄食情况，如有异常立即隔离并考虑使用针对性药物预防。注意控制养殖密度，避免水质恶化。',
     },
     feeding: {
       type: 'bar',
@@ -164,31 +175,92 @@ export default function Intelligence() {
           },
         ],
       },
+      adviceText: '数据显示“策略B (优化)”的饲料转化率最佳。建议全面推广策略B，该策略可能涉及调整投喂时间和每日投喂次数。持续监测FCR数据，并根据鱼体规格和水温变化进行微调。可小范围尝试“策略C”以探索进一步优化的可能性。',
     },
     environment: {
       type: 'line',
-      title: '关键环境参数稳定性',
+      title: '国控水站水质评价指标',
       data: {
         labels: ['1天前', '12小时前', '6小时前', '当前', '预计6小时后', '预计12小时后'],
         datasets: [
           {
-            label: '溶解氧 (mg/L)',
-            data: [7.2, 7.5, 7.3, 7.6, 7.4, 7.1],
-            borderColor: 'rgb(34, 197, 94)', // green-600
-            backgroundColor: 'rgba(34, 197, 94, 0.5)',
+            label: 'pH值',
+            data: [7.8, 7.9, 7.7, 8.0, 7.9, 7.8],
+            borderColor: 'rgb(59, 130, 246)',
+            backgroundColor: 'rgba(59, 130, 246, 0.5)',
             tension: 0.1,
+            yAxisID: 'y',
           },
           {
-            label: '水温 (°C)',
-            data: [22, 22.5, 22.3, 23, 23.2, 22.8],
-            borderColor: 'rgb(239, 68, 68)', // red-500
+            label: '溶解氧 (mg/L)',
+            data: [7.2, 7.5, 7.3, 7.6, 7.4, 7.1],
+            borderColor: 'rgb(34, 197, 94)',
+            backgroundColor: 'rgba(34, 197, 94, 0.5)',
+            tension: 0.1,
+            yAxisID: 'y',
+          },
+          {
+            label: '高锰酸盐指数 (mg/L)',
+            data: [2.5, 2.7, 2.6, 2.8, 2.5, 2.4],
+            borderColor: 'rgb(139, 92, 246)',
+            backgroundColor: 'rgba(139, 92, 246, 0.5)',
+            tension: 0.1,
+            yAxisID: 'y',
+          },
+          {
+            label: '氨氮 (mg/L)',
+            data: [0.1, 0.15, 0.12, 0.18, 0.16, 0.13],
+            borderColor: 'rgb(245, 158, 11)',
+            backgroundColor: 'rgba(245, 158, 11, 0.5)',
+            tension: 0.1,
+            yAxisID: 'y1',
+          },
+          {
+            label: '总磷 (mg/L)',
+            data: [0.02, 0.03, 0.025, 0.035, 0.03, 0.028],
+            borderColor: 'rgb(239, 68, 68)',
             backgroundColor: 'rgba(239, 68, 68, 0.5)',
             tension: 0.1,
+            yAxisID: 'y1',
           },
         ],
       },
+      adviceText: '当前各项水质指标总体在可控范围内，但需注意氨氮和总磷有轻微上升趋势。建议检查排污系统，适度增加换水量，并考虑使用底质改良剂。未来12小时溶解氧有下降趋势，请确保增氧设备正常运行，必要时增加开启时长。',
     },
   };
+
+  // 更新环境评估图表的Y轴配置
+  const environmentChartOptions: ChartOptions<'line'> = {
+    ...commonChartOptions,
+    scales: {
+        ...commonChartOptions.scales,
+        y: {
+            type: 'linear',
+            display: true,
+            position: 'left',
+            title: {
+                display: true,
+                text: 'pH / DO (mg/L) / Perm. Index (mg/L)',
+                color: '#4A5568',
+            },
+            ticks: { color: '#4A5568' },
+            grid: { drawOnChartArea: true, color: '#E2E8F0' }, // Ensure grid is drawn for primary axis
+        },
+        y1: {
+            type: 'linear',
+            display: true,
+            position: 'right',
+            title: {
+                display: true,
+                text: 'NH₃-N (mg/L) / TP (mg/L)',
+                color: '#4A5568',
+            },
+            ticks: { color: '#4A5568' },
+            grid: { drawOnChartArea: false }, 
+        },
+    }
+  };
+
 
   const currentChartInfo = selectedAnalysis ? analysisChartData[selectedAnalysis] : null;
 
@@ -269,18 +341,30 @@ export default function Intelligence() {
                   <FaTimes className="w-5 h-5 text-gray-600" />
                 </button>
               </div>
-              <div className="h-[400px] md:h-[500px]">
+              <div className="h-[400px] md:h-[500px] mb-6"> {/* Added margin-bottom to chart container */}
                 {currentChartInfo.type === 'line' ? (
-                  <Line
-                    data={currentChartInfo.data as ChartData<'line'>}
-                    options={{ ...commonChartOptions, plugins: { ...commonChartOptions.plugins, title: { ...commonChartOptions.plugins?.title, text: currentChartInfo.title } } } as ChartOptions<'line'>}
+                  <Line 
+                    data={currentChartInfo.data as ChartData<'line'>} 
+                    options={selectedAnalysis === 'environment' ? 
+                             (environmentChartOptions as ChartOptions<'line'>) :
+                             (commonChartOptions as ChartOptions<'line'>)} 
                   />
                 ) : (
-                  <Bar
-                    data={currentChartInfo.data as ChartData<'bar'>}
-                    options={{ ...commonChartOptions, plugins: { ...commonChartOptions.plugins, title: { ...commonChartOptions.plugins?.title, text: currentChartInfo.title } } } as ChartOptions<'bar'>}
+                  <Bar 
+                    data={currentChartInfo.data as ChartData<'bar'>} 
+                    options={commonChartOptions as ChartOptions<'bar'>}
                   />
                 )}
+              </div>
+              {/* 文字建议区 */}
+              <div className="mt-6 p-4 bg-blue-50 border-l-4 border-blue-500 rounded-r-lg">
+                <h3 className="text-lg font-semibold text-blue-700 mb-2 flex items-center">
+                  <FaLightbulb className="w-5 h-5 mr-2 text-blue-600" />
+                  图表解读与建议
+                </h3>
+                <p className="text-sm text-gray-700 leading-relaxed">
+                  {currentChartInfo.adviceText}
+                </p>
               </div>
             </div>
           )}
