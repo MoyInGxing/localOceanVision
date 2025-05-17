@@ -206,3 +206,11 @@ go run main.go
 ```
 多次运行可能会出现端口 8080 已经被其他程序占用，可以选择杀死（如果后端代码改变的话）
 
+### 数据库相关
+查询指令
+```bash
+mysql -u lmyx -p1 idm -e "use users"   
+mysql -u lmyx -p1 idm -e "SELECT * FROM users;"
+mysql -u lmyx -p1 idm -e "SELECT * FROM sessions;"
+```
+
