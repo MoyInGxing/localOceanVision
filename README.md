@@ -169,12 +169,40 @@ git push
 **总结：分支要确保是dev，提交前先拉取**
 
 
-## 当前模拟账户（后端未实现）
-管理员账号：
-- 用户名：admin
-- 密码：admin123
+## backend 相关
+### 初始化配置线管
+第一次运行项目时，在 MySQL 命令行中，依次执行以下命令：
+1. 创建数据库：
+```sql
+CREATE DATABASE idm CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+```
+2. 创建用户并设置密码：
+```sql
+CREATE USER 'lmyx'@'localhost' IDENTIFIED BY '1';
+```
+3. 授予用户权限：
+```sql
+GRANT ALL PRIVILEGES ON idm.* TO 'lmyx'@'localhost';
+FLUSH PRIVILEGES;
+```
+4. 验证数据库是否创建成功：
+```sql
+SHOW DATABASES;
+```
+5. 切换到 idm 数据库：
+```sql
+USE idm;
+```
 
-普通用户账号：
-- 用户名：user
-- 密码：user123
+### 运行相关
+首次运行可能需要安装
+```bash
+go get github.com/gin-contrib/cors
+```
+启动go后端
+```bash
+cd .\idmbackend\
+go run main.go
+```
+多次运行可能会出现端口 8080 已经被其他程序占用，可以选择杀死（如果后端代码改变的话）
 
