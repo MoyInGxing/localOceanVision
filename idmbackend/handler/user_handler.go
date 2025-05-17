@@ -5,6 +5,7 @@ import (
 	"github.com/MoyInGxing/idm/domain"
 	"github.com/gin-gonic/gin"
 	"net/http"
+	"log"
 )
 
 type UserHandler struct {
@@ -74,12 +75,19 @@ func (h *UserHandler) Login(c *gin.Context) {
 	// 在实际应用中，这里应该使用 JWT 或其他 token 生成方式
 	testToken := "test_token_" + request.Username
 
+	// 检查是否是管理员账号
+	role := "user"
+	if request.Username == "admin" && request.Password == "admin123" {
+		role = "admin"
+		log.Printf("管理员登录成功，设置角色为: %s", role)
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"token": testToken,
 		"user": gin.H{
 			"id":       1,
 			"username": request.Username,
-			"role":     "user",
+			"role":     role,
 		},
 	})
 }
@@ -92,14 +100,15 @@ func (h *UserHandler) GetProfile(c *gin.Context) {
 		return
 	}
 
-	// 获取用户角色
+	// 获取用户角色和用户名
 	userRole, _ := c.Get("userRole")
+	username, _ := c.Get("username")
 
 	// 返回用户信息
 	c.JSON(http.StatusOK, gin.H{
 		"user": gin.H{
 			"id":       userID,
-			"username": "test_user",
+			"username": username,
 			"role":     userRole,
 		},
 	})
@@ -108,13 +117,24 @@ func (h *UserHandler) GetProfile(c *gin.Context) {
 func (h *UserHandler) GetAdminDashboard(c *gin.Context) {
 	// 从上下文中获取用户角色
 	userRole, exists := c.Get("userRole")
-	if !exists || userRole != "admin" {
+	if !exists {
+		log.Printf("管理员仪表板 - 未找到用户角色")
 		c.JSON(http.StatusForbidden, gin.H{"error": "需要管理员权限"})
 		return
 	}
 
-	// TODO: 实现实际的管理员仪表板数据获取逻辑
+	log.Printf("管理员仪表板 - 当前用户角色: %v", userRole)
 
+	// 检查是否是管理员
+	if userRole != "admin" {
+		log.Printf("管理员仪表板 - 用户角色不是管理员: %v", userRole)
+		c.JSON(http.StatusForbidden, gin.H{"error": "需要管理员权限"})
+		return
+	}
+
+	log.Printf("管理员仪表板 - 访问成功")
+
+	// TODO: 实现实际的管理员仪表板数据获取逻辑
 	c.JSON(http.StatusOK, gin.H{
 		"message": "管理员仪表板数据",
 		"data": gin.H{

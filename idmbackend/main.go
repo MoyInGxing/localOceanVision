@@ -5,7 +5,8 @@ import (
 	"github.com/MoyInGxing/idm/config"
 	"github.com/MoyInGxing/idm/handler"
 	"github.com/MoyInGxing/idm/infra/database"
-	"github.com/MoyInGxing/idm/myrouter"
+	"github.com/MoyInGxing/idm/internal/myrouter"
+	"github.com/MoyInGxing/idm/middleware"
 	"log"
 )
 
@@ -27,10 +28,10 @@ func main() {
 	authService := app.NewAuthService(userRepo, sessionRepo, cfg)
 
 	userHandler := handler.NewUserHandler(userService, authService)
-	authMiddleware := handler.AuthMiddleware(authService)
-	adminAuthMiddleware := handler.AdminAuthMiddleware(authService)
+	authMiddleware := middleware.NewAuthMiddleware()
+	adminAuthMiddleware := middleware.NewAdminAuthMiddleware()
 
-	r := myrouter.SetupRouter(userHandler, &authMiddleware, &adminAuthMiddleware)
+	r := myrouter.SetupRouter(userHandler, authMiddleware, adminAuthMiddleware)
 
 	if err := r.Run(":8080"); err != nil {
 		log.Fatalf("Failed to run server: %v", err)
