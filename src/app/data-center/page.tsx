@@ -11,10 +11,44 @@ interface DataPoint {
   value: number;
 }
 
+// 定义水质状态类型
+type WaterQualityStatus = 'normal' | 'warning' | 'error';
+
+// 定义水质数据类型
+interface WaterQuality {
+  temperature: number;
+  oxygen: number;
+  ph: number;
+  turbidity: number;
+  status: WaterQualityStatus;
+}
+
+// 定义省份数据类型
+interface ProvinceFeature {
+  type: "Feature";
+  properties: {
+    name: string;
+    waterQuality: WaterQuality;
+  };
+  geometry: {
+    type: "Polygon";
+    coordinates: number[][][];
+  };
+}
+
+// 定义GeoJSON数据类型
+interface GeoJSONData {
+  type: "FeatureCollection";
+  features: ProvinceFeature[];
+}
+
 export default function DataCenter() {
+  console.log("DataCenter组件开始渲染");
+  
   const [dateRange, setDateRange] = useState('week');
   const [selectedMetric, setSelectedMetric] = useState('temperature');
   const [timeRange, setTimeRange] = useState(7); // 默认显示最近7天
+  const [isMounted, setIsMounted] = useState(false); // 添加挂载状态
   
   // 引用DOM元素
   const temperatureChartRef = useRef<SVGSVGElement | null>(null);
@@ -399,9 +433,89 @@ export default function DataCenter() {
       .text("产量 (吨)");
   };
   
+  // 添加组件挂载效果
+  useEffect(() => {
+    console.log("DataCenter组件开始挂载...");
+    setIsMounted(true);
+    return () => {
+      console.log("DataCenter组件开始卸载...");
+      setIsMounted(false);
+    };
+  }, []);
+
+  // 初始化图表
+  useEffect(() => {
+    if (!isMounted) {
+      console.log("组件未挂载，跳过初始化");
+      return;
+    }
+
+    console.log("组件已挂载，开始初始化...");
+    console.log("图表引用状态:", {
+      temperatureChart: temperatureChartRef.current,
+      productionChart: productionChartRef.current,
+      chinaMap: chinaMapRef.current
+    });
+
+    const temperatureData = generateTimeData(timeRange);
+    const productionData = generateProductionData(timeRange);
+    
+    createTemperatureChart(temperatureData);
+    createProductionChart(productionData);
+    createChinaMap().catch(error => console.error("地图渲染失败:", error));
+  }, [isMounted]); // 只依赖isMounted
+
+  // 当时间范围或指标变化时重新渲染图表
+  useEffect(() => {
+    if (!isMounted) return;
+
+    console.log("时间范围或指标变化，重新渲染图表");
+    const temperatureData = generateTimeData(timeRange);
+    const productionData = generateProductionData(timeRange);
+    
+    createTemperatureChart(temperatureData);
+    createProductionChart(productionData);
+    createChinaMap().catch(error => console.error("地图渲染失败:", error));
+    
+    // 清理函数
+    return () => {
+      d3.selectAll(".tooltip").remove();
+    };
+  }, [timeRange, dateRange, selectedMetric]); // 只依赖这些状态
+  
+  // 根据水质指标判断状态
+  function getStatus(temperature: number, ph: number, oxygen: number, turbidity: number): WaterQualityStatus {
+    // 设置更合理的阈值
+    if (isNaN(temperature) || isNaN(ph) || isNaN(oxygen) || isNaN(turbidity)) {
+      return "warning";
+    }
+    
+    // 异常状态阈值 - 更严格的条件
+    if (temperature > 32 || temperature < 10 || 
+        ph > 9.5 || ph < 5.5 || 
+        oxygen < 2 || 
+        turbidity > 95) {
+      return "error";
+    }
+    
+    // 警告状态阈值 - 更严格的条件
+    if (temperature > 30 || temperature < 12 || 
+        ph > 9.0 || ph < 6.0 || 
+        oxygen < 3 || 
+        turbidity > 85) {
+      return "warning";
+    }
+    
+    return "normal";
+  }
+
   // 创建中国地图可视化
   const createChinaMap = async () => {
-    if (!chinaMapRef.current) return;
+    console.log("开始创建中国地图...");
+    if (!chinaMapRef.current) {
+      console.log("地图容器不存在，跳过地图创建");
+      return;
+    }
     
     // 清除之前的图表
     d3.select(chinaMapRef.current).selectAll("*").remove();
@@ -409,97 +523,220 @@ export default function DataCenter() {
     // 设置地图尺寸和边距
     const width = chinaMapRef.current.clientWidth;
     const height = 500;
+    console.log("地图尺寸:", { width, height });
     
     // 创建SVG
     const svg = d3.select(chinaMapRef.current)
       .attr("width", width)
       .attr("height", height);
     
-    // 定义投影
-    const projection = d3.geoMercator();
-    
-    // 创建路径生成器
-    const pathGenerator = d3.geoPath().projection(projection);
-    
-    // 创建提示框
-    const tooltip = d3.select("body").append("div")
-      .attr("class", "tooltip")
-      .style("position", "absolute")
-      .style("visibility", "hidden")
-      .style("opacity", 0)
-      .style("background-color", "rgba(0, 0, 0, 0.8)")
-      .style("color", "white")
-      .style("padding", "8px")
-      .style("border-radius", "4px")
-      .style("font-size", "12px")
-      .style("pointer-events", "none");
-    
     try {
-      // 加载GeoJSON数据
-      const geoData = await d3.json("/dataset/china.json");
-      
-      // 使投影适应数据并居中
-      projection.fitSize([width, height], geoData as any);
-      
-      // 绘制地图路径
-      const mapGroup = svg.append("g").attr("class", "map-group");
-      
-      mapGroup.selectAll("path")
-        .data((geoData as any).features)
-        .enter()
-        .append("path")
-        .attr("class", "province")
-        .attr("d", (d: any) => pathGenerator(d))
-        .attr("fill", "#4361ee")
-        .attr("stroke", "#fff")
-        .attr("stroke-width", 0.5)
-        .attr("data-name", (d: any) => d.properties.name)
-        .on("mouseover", function(event, d) {
-          d3.select(this)
-            .transition()
-            .duration(200)
-            .attr("fill", "#7209b7")
-            .attr("opacity", 1);
-          
-          tooltip.transition()
-            .duration(200)
-            .style("opacity", 0.9)
-            .style("visibility", "visible")
-            .style("left", (event.pageX + 10) + "px")
-            .style("top", (event.pageY - 28) + "px");
-          
-          tooltip.html(`<strong>${(d as any).properties.name}</strong>`);
-        })
-        .on("mouseout", function() {
-          d3.select(this)
-            .transition()
-            .duration(200)
-            .attr("fill", "#4361ee")
-            .attr("opacity", 0.8);
-          
-          tooltip.transition()
-            .duration(500)
-            .style("opacity", 0)
-            .style("visibility", "hidden");
-        });
-      
+      // 添加背景
+      svg.append("rect")
+        .attr("width", width)
+        .attr("height", height)
+        .attr("fill", "#f8fafc");
+
       // 添加标题
       svg.append("text")
         .attr("x", width / 2)
-        .attr("y", 20)
+        .attr("y", 30)
         .attr("text-anchor", "middle")
         .style("font-size", "16px")
         .style("font-weight", "bold")
-        .text("中国地区分布");
+        .text("中国海洋养殖区域分布");
+
+      // 添加说明文字
+      svg.append("text")
+        .attr("x", width / 2)
+        .attr("y", height / 2)
+        .attr("text-anchor", "middle")
+        .style("font-size", "14px")
+        .style("fill", "#666")
+        .text("正在加载地图数据...");
+
+      console.log("开始加载GeoJSON数据...");
       
-      // 添加缩放和拖拽功能
-      const zoom = d3.zoom()
-        .scaleExtent([1, 8]) // 缩放范围
-        .on("zoom", (event) => {
-          mapGroup.attr("transform", event.transform);
+      // 加载所有省份的GeoJSON数据
+      const provinceFiles = [
+        "110000", "120000", "130000", "140000", "150000",
+        "210000", "220000", "230000", "310000", "320000",
+        "330000", "340000", "350000", "360000", "370000",
+        "410000", "420000", "430000", "440000", "450000",
+        "460000", "500000", "510000", "520000", "530000",
+        "540000", "610000", "620000", "630000", "640000",
+        "650000", "710000", "810000", "820000"
+      ];
+
+      const features = [];
+      for (const code of provinceFiles) {
+        try {
+          const response = await fetch(`/geojson_full/province/${code}.json`);
+          if (!response.ok) {
+            console.warn(`无法加载省份 ${code} 的数据`);
+            continue;
+          }
+          const data = await response.json();
+          if (data && data.features) {
+            features.push(...data.features);
+          }
+        } catch (error) {
+          console.warn(`加载省份 ${code} 数据时出错:`, error);
+        }
+      }
+
+      const geoData = {
+        type: "FeatureCollection",
+        features: features
+      };
+
+      if (!geoData || !geoData.features || !Array.isArray(geoData.features)) {
+        throw new Error("GeoJSON数据格式不正确");
+      }
+      console.log("GeoJSON数据加载成功，特征数量:", geoData.features.length);
+
+      // 定义投影
+      const projection = d3.geoMercator()
+        .center([105, 38])
+        .scale(800)
+        .translate([width / 2, height / 2]);
+
+      // 创建路径生成器
+      const pathGenerator = d3.geoPath().projection(projection);
+
+      // 绘制地图路径
+      const mapGroup = svg.append("g").attr("class", "map-group");
+
+      // 生成模拟数据
+      const generateProvinceData = () => {
+        return geoData.features.map(feature => ({
+          name: feature.properties.name,
+          temperature: 15 + Math.random() * 15, // 15-30°C
+          ph: 6.5 + Math.random() * 2.5, // 6.5-9.0
+          oxygen: 3 + Math.random() * 7, // 3-10mg/L
+          turbidity: 10 + Math.random() * 90 // 10-100NTU
+        }));
+      };
+
+      const provinceData = generateProvinceData();
+      console.log("生成省份数据:", provinceData);
+
+      // 定义状态颜色映射
+      const statusColors: Record<WaterQualityStatus, string> = {
+        normal: "#4361ee",
+        warning: "#f59e0b",
+        error: "#ef4444"
+      };
+
+      // 绘制省份边界
+      const paths = mapGroup.selectAll("path")
+        .data(geoData.features)
+        .enter()
+        .append("path")
+        .attr("class", "province")
+        .attr("d", (d: any) => {
+          const path = pathGenerator(d);
+          if (!path) {
+            console.warn(`省份 ${d.properties?.name} 的路径生成失败`);
+            return "";
+          }
+          return path;
+        })
+        .attr("fill", (d: any) => {
+          const province = provinceData.find(p => p.name === d.properties.name);
+          if (!province) return "#ccc";
+          const status = getStatus(
+            province.temperature,
+            province.ph,
+            province.oxygen,
+            province.turbidity
+          );
+          return statusColors[status];
+        })
+        .attr("stroke", "#fff")
+        .attr("stroke-width", 0.5)
+        .attr("opacity", 0.8)
+        .on("mouseover", function(event, d) {
+          const province = provinceData.find(p => p.name === d.properties.name);
+          if (province) {
+            d3.select(this)
+              .attr("opacity", 1)
+              .attr("stroke-width", 1);
+
+            // 显示详细信息
+            const tooltip = d3.select("body").append("div")
+              .attr("class", "tooltip")
+              .style("position", "absolute")
+              .style("visibility", "visible")
+              .style("background-color", "rgba(0, 0, 0, 0.8)")
+              .style("color", "white")
+              .style("padding", "8px")
+              .style("border-radius", "4px")
+              .style("font-size", "12px")
+              .style("pointer-events", "none")
+              .html(`
+                <div>${d.properties.name}</div>
+                <div>温度: ${province.temperature.toFixed(1)}°C</div>
+                <div>pH值: ${province.ph.toFixed(1)}</div>
+                <div>溶解氧: ${province.oxygen.toFixed(1)}mg/L</div>
+                <div>浊度: ${province.turbidity.toFixed(1)}NTU</div>
+              `)
+              .style("left", (event.pageX + 10) + "px")
+              .style("top", (event.pageY - 28) + "px");
+          }
+        })
+        .on("mouseout", function() {
+          d3.select(this)
+            .attr("opacity", 0.8)
+            .attr("stroke-width", 0.5);
+          d3.selectAll(".tooltip").remove();
         });
-      svg.call(zoom as any);
-      
+
+      console.log("地图绘制完成，共绘制", paths.size(), "个省份");
+
+      // 移除加载提示
+      svg.selectAll("text.loading-text").remove();
+
+      // 添加图例
+      const legend = svg.append("g")
+        .attr("class", "legend")
+        .attr("transform", `translate(${width - 150}, ${height - 100})`);
+
+      // 添加图例标题
+      legend.append("text")
+        .attr("class", "legend-title")
+        .attr("x", 0)
+        .attr("y", -10)
+        .style("font-size", "12px")
+        .style("font-weight", "bold")
+        .text("图例");
+
+      // 添加图例项
+      const legendItems = [
+        { color: "#4361ee", label: "正常区域" },
+        { color: "#f59e0b", label: "警告区域" },
+        { color: "#ef4444", label: "异常区域" }
+      ];
+
+      legendItems.forEach((item, i) => {
+        const g = legend.append("g")
+          .attr("transform", `translate(0, ${i * 20})`);
+
+        g.append("rect")
+          .attr("width", 15)
+          .attr("height", 15)
+          .attr("fill", item.color)
+          .attr("stroke", "#fff")
+          .attr("stroke-width", 0.5);
+
+        g.append("text")
+          .attr("class", "legend-text")
+          .attr("x", 25)
+          .attr("y", 12)
+          .style("font-size", "12px")
+          .text(item.label);
+      });
+
     } catch (error) {
       console.error("加载或绘制地图数据失败:", error);
       svg.append("text")
@@ -512,21 +749,6 @@ export default function DataCenter() {
     }
   };
 
-  // 当时间范围或指标变化时重新渲染图表
-  useEffect(() => {
-    const temperatureData = generateTimeData(timeRange);
-    const productionData = generateProductionData(timeRange);
-    
-    createTemperatureChart(temperatureData);
-    createProductionChart(productionData);
-    createChinaMap().catch(error => console.error("地图渲染失败:", error));
-    
-    // 清理函数
-    return () => {
-      d3.selectAll(".tooltip").remove();
-    };
-  }, [timeRange, dateRange, selectedMetric]);
-  
   // 窗口大小变化时重新渲染图表
   useEffect(() => {
     const handleResize = () => {
@@ -569,7 +791,10 @@ export default function DataCenter() {
               <select
                 className="px-4 py-2 border border-gray-300 rounded-lg"
                 value={dateRange}
-                onChange={(e) => setDateRange(e.target.value)}
+                onChange={(e) => {
+                  console.log("日期范围改变:", e.target.value);
+                  setDateRange(e.target.value);
+                }}
               >
                 <option value="day">今日</option>
                 <option value="week">本周</option>
@@ -579,7 +804,10 @@ export default function DataCenter() {
               <select
                 className="px-4 py-2 border border-gray-300 rounded-lg"
                 value={selectedMetric}
-                onChange={(e) => setSelectedMetric(e.target.value)}
+                onChange={(e) => {
+                  console.log("指标改变:", e.target.value);
+                  setSelectedMetric(e.target.value);
+                }}
               >
                 <option value="temperature">水温</option>
                 <option value="oxygen">溶解氧</option>
@@ -589,7 +817,10 @@ export default function DataCenter() {
               <select
                 className="px-4 py-2 border border-gray-300 rounded-lg"
                 value={timeRange}
-                onChange={(e) => setTimeRange(Number(e.target.value))}
+                onChange={(e) => {
+                  console.log("时间范围改变:", e.target.value);
+                  setTimeRange(Number(e.target.value));
+                }}
               >
                 <option value="3">最近3天</option>
                 <option value="7">最近7天</option>
@@ -680,7 +911,11 @@ export default function DataCenter() {
           <div className="bg-white p-6 rounded-lg shadow-lg">
             <h2 className="text-xl font-semibold mb-6">地区分布</h2>
             <div className="h-[500px] relative">
-              <svg ref={chinaMapRef} className="w-full h-full"></svg>
+              <svg 
+                ref={chinaMapRef} 
+                className="w-full h-full"
+                style={{ border: '1px solid #eee' }}
+              ></svg>
             </div>
           </div>
         </div>

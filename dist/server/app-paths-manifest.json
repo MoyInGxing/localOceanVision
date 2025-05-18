@@ -1,5 +1,11 @@
 {
-  "/not-found": "app/not-found.js",
-  "/test/page": "app/test/page.js",
-  "/favicon.ico/route": "app/favicon.ico/route.js"
+  "/login/page": "app/login/page.js",
+  "/page": "app/page.js",
+  "/register/page": "app/register/page.js",
+  "/dashboard/page": "app/dashboard/page.js",
+  "/underwater/page": "app/underwater/page.js",
+  "/intelligence/page": "app/intelligence/page.js",
+  "/data-center/page": "app/data-center/page.js",
+  "/admin/page": "app/admin/page.js",
+  "/api/dataset/route": "app/api/dataset/route.js"
 }
