@@ -1,8 +1,9 @@
 {
-  "/page": "app/page.js",
-  "/api/auth/validate/route": "app/api/auth/validate/route.js",
+  "/underwater/page": "app/underwater/page.js",
+  "/dashboard/page": "app/dashboard/page.js",
+  "/intelligence/page": "app/intelligence/page.js",
   "/login/page": "app/login/page.js",
-  "/favicon.ico/route": "app/favicon.ico/route.js",
-  "/register/page": "app/register/page.js",
-  "/dashboard/page": "app/dashboard/page.js"
+  "/data-center/page": "app/data-center/page.js",
+  "/api/dataset/route": "app/api/dataset/route.js",
+  "/admin/page": "app/admin/page.js"
 }
