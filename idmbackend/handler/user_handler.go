@@ -42,6 +42,8 @@ func (h *UserHandler) Register(c *gin.Context) {
 	var request struct {
 		Username string `json:"username" binding:"required"`
 		Password string `json:"password" binding:"required"`
+		Email    string `json:"email"`
+		Phone    string `json:"phone"`
 	}
 
 	if err := c.ShouldBindJSON(&request); err != nil {
@@ -49,13 +51,24 @@ func (h *UserHandler) Register(c *gin.Context) {
 		return
 	}
 
-	// TODO: 实现实际的注册逻辑
-	// 这里应该添加用户创建、密码加密等逻辑
+	// 使用UserService创建新用户
+	user, err := h.userService.RegisterUser(request.Username, request.Password)
+	if err != nil {
+		if err == domain.ErrUserAlreadyExists {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "用户名已存在"})
+			return
+		}
+		log.Printf("注册失败: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "注册失败，请稍后重试"})
+		return
+	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"message": "注册成功",
 		"user": gin.H{
-			"username": request.Username,
+			"id":       user.ID,
+			"username": user.Username,
+			"role":     user.Role,
 		},
 	})
 }

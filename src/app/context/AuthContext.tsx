@@ -90,7 +90,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             });
 
             if (!response.ok) {
-                throw new Error('登录失败');
+                const data = await response.json();
+                throw new Error(data.error || '登录失败');
             }
 
             const data = await response.json();
@@ -107,7 +108,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const register = async (username: string, password: string, email: string, phone: string) => {
         try {
             console.log("AuthProvider: 开始注册");
-            const response = await fetch('/api/auth/register', {
+            const response = await fetch('/api/register', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

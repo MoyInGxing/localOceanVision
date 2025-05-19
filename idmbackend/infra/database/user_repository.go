@@ -1,6 +1,8 @@
 package database
 
 import (
+	"log"
+
 	"github.com/MoyInGxing/idm/domain"
 	"gorm.io/gorm"
 )
@@ -14,13 +16,23 @@ func NewGORMUserRepository(db *gorm.DB) *GORMUserRepository {
 }
 
 func (r *GORMUserRepository) Create(user *domain.User) error {
-	return r.db.Create(user).Error
+	log.Printf("正在创建用户: %+v", user)
+	err := r.db.Create(user).Error
+	if err != nil {
+		log.Printf("创建用户失败: %v", err)
+		return err
+	}
+	log.Printf("用户创建成功，ID: %d", user.ID)
+	return nil
 }
 
 func (r *GORMUserRepository) FindByUsername(username string) (*domain.User, error) {
 	var user domain.User
 	err := r.db.Where("username = ?", username).First(&user).Error
 	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, nil
+		}
 		return nil, err
 	}
 	return &user, nil

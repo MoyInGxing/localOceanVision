@@ -42,9 +42,9 @@ export default function RegisterPage() {
 
         try {
             await register(formData.username, formData.password, formData.email, formData.phone);
-            router.push('/login');
-        } catch (err) {
-            setError('注册失败，请稍后重试');
+            router.push('/login?registered=true');
+        } catch (err: any) {
+            setError(err.message || '注册失败，请稍后重试');
         } finally {
             setIsLoading(false);
         }
