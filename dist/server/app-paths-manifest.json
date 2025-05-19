@@ -1,9 +1,0 @@
-{
-  "/underwater/page": "app/underwater/page.js",
-  "/dashboard/page": "app/dashboard/page.js",
-  "/intelligence/page": "app/intelligence/page.js",
-  "/login/page": "app/login/page.js",
-  "/data-center/page": "app/data-center/page.js",
-  "/api/dataset/route": "app/api/dataset/route.js",
-  "/admin/page": "app/admin/page.js"
-}
