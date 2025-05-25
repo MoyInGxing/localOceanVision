@@ -1,11 +1,12 @@
 package myrouter
 
 import (
-	"github.com/gin-gonic/gin"
-	"github.com/gin-contrib/cors"
+	"time"
+
 	"github.com/MoyInGxing/idm/handler"
 	"github.com/MoyInGxing/idm/middleware"
-	"time"
+	"github.com/gin-contrib/cors"
+	"github.com/gin-gonic/gin"
 )
 
 func SetupRouter(
@@ -51,8 +52,11 @@ func SetupRouter(
 		admin.Use(authMiddleware.Handle(), adminAuthMiddleware.Handle())
 		{
 			admin.GET("/dashboard", userHandler.GetAdminDashboard)
+			admin.GET("/users", userHandler.GetAllUsers)
+			admin.DELETE("/users/:id", userHandler.DeleteUser)
+			admin.PUT("/users/:id/role", userHandler.UpdateUserRole)
 		}
 	}
 
 	return r
-} 
+}

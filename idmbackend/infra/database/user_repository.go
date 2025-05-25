@@ -46,3 +46,23 @@ func (r *GORMUserRepository) FindByID(id uint) (*domain.User, error) {
 	}
 	return &user, nil
 }
+
+// FindAll 获取所有用户
+func (r *GORMUserRepository) FindAll() ([]*domain.User, error) {
+	var users []*domain.User
+	err := r.db.Find(&users).Error
+	if err != nil {
+		return nil, err
+	}
+	return users, nil
+}
+
+// Delete 删除用户
+func (r *GORMUserRepository) Delete(userID string) error {
+	return r.db.Delete(&domain.User{}, userID).Error
+}
+
+// UpdateRole 更新用户角色
+func (r *GORMUserRepository) UpdateRole(userID string, role domain.Role) error {
+	return r.db.Model(&domain.User{}).Where("id = ?", userID).Update("role", role).Error
+}

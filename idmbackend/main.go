@@ -1,13 +1,14 @@
 package main
 
 import (
+	"log"
+
 	"github.com/MoyInGxing/idm/app"
 	"github.com/MoyInGxing/idm/config"
 	"github.com/MoyInGxing/idm/handler"
 	"github.com/MoyInGxing/idm/infra/database"
 	"github.com/MoyInGxing/idm/internal/myrouter"
 	"github.com/MoyInGxing/idm/middleware"
-	"log"
 )
 
 func main() {
@@ -28,8 +29,8 @@ func main() {
 	authService := app.NewAuthService(userRepo, sessionRepo, cfg)
 
 	userHandler := handler.NewUserHandler(userService, authService)
-	authMiddleware := middleware.NewAuthMiddleware()
-	adminAuthMiddleware := middleware.NewAdminAuthMiddleware()
+	authMiddleware := middleware.NewAuthMiddleware(authService)
+	adminAuthMiddleware := middleware.NewAdminAuthMiddleware(authService)
 
 	r := myrouter.SetupRouter(userHandler, authMiddleware, adminAuthMiddleware)
 
