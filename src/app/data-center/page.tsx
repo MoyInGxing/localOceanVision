@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import * as d3 from 'd3';
 import ProtectedRoute from '../components/ProtectedRoute';
-import { FaDownload, FaFilter, FaSearch } from 'react-icons/fa';
+import { FaDownload, FaFilter, FaSearch, FaFileExport } from 'react-icons/fa';
 
 // 定义数据类型
 interface DataPoint {
@@ -42,6 +42,21 @@ interface GeoJSONData {
   features: ProvinceFeature[];
 }
 
+// 定义物种数据类型
+interface SpeciesData {
+  species_id: string;
+  species_name: string;
+  scientific_name: string;
+  category: string;
+  weight: number;
+  length1: number;
+  length2: number;
+  length3: number;
+  height: number;
+  width: number;
+  optimal_temp_range: string;
+}
+
 export default function DataCenter() {
   console.log("DataCenter组件开始渲染");
   
@@ -49,12 +64,414 @@ export default function DataCenter() {
   const [selectedMetric, setSelectedMetric] = useState('temperature');
   const [timeRange, setTimeRange] = useState(7); // 默认显示最近7天
   const [isMounted, setIsMounted] = useState(false); // 添加挂载状态
+  const [speciesData, setSpeciesData] = useState<SpeciesData[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [speciesFilter, setSpeciesFilter] = useState('');
+  const [lengthFilter, setLengthFilter] = useState('');
+  const [showAllSpecies, setShowAllSpecies] = useState(false);
+  const [selectedSpecies, setSelectedSpecies] = useState('all');
+  const [selectedLengthRange, setSelectedLengthRange] = useState('all');
   
   // 引用DOM元素
   const temperatureChartRef = useRef<SVGSVGElement | null>(null);
   const productionChartRef = useRef<SVGSVGElement | null>(null);
   const chinaMapRef = useRef<SVGSVGElement | null>(null);
+  const speciesChartRef = useRef<SVGSVGElement | null>(null);
+  const speciesLengthChartRef = useRef<SVGSVGElement | null>(null);
   
+  // 获取物种数据
+  useEffect(() => {
+    const fetchSpeciesData = async () => {
+      try {
+        console.log('开始获取物种数据...');
+        const response = await fetch('http://localhost:8080/api/species', {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+          }
+        });
+
+        console.log('收到响应:', response.status);
+        if (!response.ok) {
+          throw new Error(`获取数据失败: ${response.status}`);
+        }
+
+        const data = await response.json();
+        console.log('获取到的数据:', data);
+        setSpeciesData(data);
+      } catch (err: any) {
+        console.error('获取数据时发生错误:', err);
+        setError(err?.message || '获取数据时发生错误');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchSpeciesData();
+  }, []);
+
+  // 获取所有唯一的物种名称
+  const uniqueSpecies = Array.from(new Set(speciesData.map(s => s.species_name)));
+
+  // 定义体长范围选项
+  const lengthRanges = [
+    { value: 'all', label: '全部体长' },
+    { value: '0-10', label: '0-10cm' },
+    { value: '10-20', label: '10-20cm' },
+    { value: '20-30', label: '20-30cm' },
+    { value: '30-40', label: '30-40cm' },
+    { value: '40+', label: '40cm以上' }
+  ];
+
+  // 创建物种数据图表
+  useEffect(() => {
+    if (!speciesChartRef.current || speciesData.length === 0) return;
+
+    // 清除现有图表
+    d3.select(speciesChartRef.current).selectAll("*").remove();
+
+    // 设置图表尺寸和边距
+    const margin = { top: 40, right: 30, bottom: 60, left: 60 };
+    const containerWidth = speciesChartRef.current.clientWidth || 800;
+    const width = containerWidth - margin.left - margin.right;
+    const height = 400 - margin.top - margin.bottom;
+
+    // 创建SVG
+    const svg = d3.select(speciesChartRef.current)
+      .attr("width", "100%")
+      .attr("height", "100%")
+      .attr("viewBox", `0 0 ${containerWidth} ${height + margin.top + margin.bottom}`)
+      .attr("preserveAspectRatio", "xMidYMid meet")
+      .append("g")
+      .attr("transform", `translate(${margin.left},${margin.top})`);
+
+    // 创建X轴比例尺
+    const x = d3.scaleLinear()
+      .domain([0, d3.max(speciesData, d => d.length1) || 0])
+      .range([0, width]);
+
+    // 创建Y轴比例尺
+    const y = d3.scaleLinear()
+      .domain([0, d3.max(speciesData, d => d.weight) || 0])
+      .range([height, 0]);
+
+    // 创建颜色比例尺
+    const colorScale = d3.scaleOrdinal()
+      .domain(speciesData.map(d => d.species_name))
+      .range(d3.schemeCategory10);
+
+    // 创建大小比例尺
+    const sizeScale = d3.scaleLinear()
+      .domain([0, d3.max(speciesData, d => d.weight / 30 + d.length1) || 0])
+      .range([5, 15]);
+
+    // 添加X轴
+    svg.append("g")
+      .attr("transform", `translate(0,${height})`)
+      .call(d3.axisBottom(x).ticks(5).tickFormat(d => `${d}cm`))
+      .style("font-size", "12px");
+
+    // 添加Y轴
+    svg.append("g")
+      .call(d3.axisLeft(y).ticks(5).tickFormat(d => `${d}g`))
+      .style("font-size", "12px");
+
+    // 添加网格线
+    svg.append("g")
+      .attr("class", "grid")
+      .selectAll("line")
+      .data(y.ticks(5))
+      .enter()
+      .append("line")
+      .attr("x1", 0)
+      .attr("x2", width)
+      .attr("y1", d => y(d))
+      .attr("y2", d => y(d))
+      .attr("stroke", "rgba(0, 0, 0, 0.1)");
+
+    // 添加散点
+    svg.selectAll("circle")
+      .data(speciesData)
+      .enter()
+      .append("circle")
+      .attr("cx", d => x(d.length1))
+      .attr("cy", d => y(d.weight))
+      .attr("r", d => sizeScale(d.weight / 30 + d.length1))
+      .attr("fill", d => colorScale(d.species_name))
+      .attr("opacity", 0.6)
+      .attr("stroke", "#fff")
+      .attr("stroke-width", 1);
+
+    // 添加标题
+    svg.append("text")
+      .attr("x", width / 2)
+      .attr("y", -10)
+      .attr("text-anchor", "middle")
+      .style("font-size", "18px")
+      .style("font-weight", "bold")
+      .style("fill", "#1a365d")
+      .text("鱼类体长-体重分布关系图");
+
+    // 添加副标题
+    svg.append("text")
+      .attr("x", width / 2)
+      .attr("y", 15)
+      .attr("text-anchor", "middle")
+      .style("font-size", "12px")
+      .style("fill", "#4a5568")
+      .text("注：点的大小表示综合指标(体重/30 + 体长)");
+
+    // 添加X轴标签
+    svg.append("text")
+      .attr("x", width / 2)
+      .attr("y", height + margin.bottom - 10)
+      .attr("text-anchor", "middle")
+      .style("font-size", "12px")
+      .style("fill", "#4a5568")
+      .text("体长 (cm)");
+
+    // 添加Y轴标签
+    svg.append("text")
+      .attr("transform", "rotate(-90)")
+      .attr("x", -height / 2)
+      .attr("y", -margin.left + 20)
+      .attr("text-anchor", "middle")
+      .style("font-size", "12px")
+      .style("fill", "#4a5568")
+      .text("体重 (g)");
+
+    // 添加图例
+    const legend = svg.append("g")
+      .attr("class", "legend")
+      .attr("transform", `translate(${width - 120}, 30)`);
+
+    // 添加图例标题
+    legend.append("text")
+      .attr("x", 0)
+      .attr("y", -10)
+      .style("font-size", "12px")
+      .style("font-weight", "bold")
+      .style("fill", "#4a5568")
+      .text("物种图例");
+
+    const uniqueSpecies = Array.from(new Set(speciesData.map(d => d.species_name)));
+    uniqueSpecies.forEach((species, i) => {
+      const legendRow = legend.append("g")
+        .attr("transform", `translate(0, ${i * 20})`);
+
+      legendRow.append("circle")
+        .attr("cx", 0)
+        .attr("cy", 0)
+        .attr("r", 6)
+        .attr("fill", colorScale(species))
+        .attr("opacity", 0.6);
+
+      legendRow.append("text")
+        .attr("x", 15)
+        .attr("y", 4)
+        .style("font-size", "12px")
+        .style("fill", "#4a5568")
+        .text(species);
+    });
+
+    // 添加交互提示
+    const tooltip = d3.select("body").append("div")
+      .attr("class", "tooltip")
+      .style("position", "absolute")
+      .style("visibility", "hidden")
+      .style("background-color", "rgba(0, 0, 0, 0.8)")
+      .style("color", "white")
+      .style("padding", "8px")
+      .style("border-radius", "4px")
+      .style("font-size", "12px");
+
+    svg.selectAll("circle")
+      .on("mouseover", function(event: any, d: any) {
+        const species = d as SpeciesData;
+        d3.select(this)
+          .transition()
+          .duration(200)
+          .attr("opacity", 1)
+          .attr("stroke-width", 2);
+
+        tooltip
+          .style("visibility", "visible")
+          .html(`
+            <div class="font-bold mb-1">${species.species_name}</div>
+            <div>体重: ${species.weight}g</div>
+            <div>体长: ${species.length1}cm</div>
+            <div>类别: ${species.category}</div>
+            <div>适宜温度: ${species.optimal_temp_range}</div>
+          `)
+          .style("left", (event.pageX + 10) + "px")
+          .style("top", (event.pageY - 28) + "px");
+      })
+      .on("mouseout", function() {
+        d3.select(this)
+          .transition()
+          .duration(200)
+          .attr("opacity", 0.6)
+          .attr("stroke-width", 1);
+        tooltip.style("visibility", "hidden");
+      });
+  }, [speciesData]);
+
+  // 创建物种体长分布图
+  useEffect(() => {
+    if (!speciesLengthChartRef.current || speciesData.length === 0) return;
+
+    // 清除现有图表
+    d3.select(speciesLengthChartRef.current).selectAll("*").remove();
+
+    // 设置图表尺寸和边距
+    const margin = { top: 40, right: 30, bottom: 60, left: 60 };
+    const width = 800 - margin.left - margin.right;
+    const height = 400 - margin.top - margin.bottom;
+
+    // 创建SVG
+    const svg = d3.select(speciesLengthChartRef.current)
+      .attr("width", width + margin.left + margin.right)
+      .attr("height", height + margin.top + margin.bottom)
+      .append("g")
+      .attr("transform", `translate(${margin.left},${margin.top})`);
+
+    // 创建X轴比例尺
+    const x = d3.scaleBand()
+      .domain(speciesData.map(d => d.species_name))
+      .range([0, width])
+      .padding(0.2);
+
+    // 创建Y轴比例尺
+    const y = d3.scaleLinear()
+      .domain([0, d3.max(speciesData, d => d.length1) * 1.1 || 0])
+      .range([height, 0]);
+
+    // 添加渐变
+    const gradient = svg.append("defs")
+      .append("linearGradient")
+      .attr("id", "length-bar-gradient")
+      .attr("x1", "0%")
+      .attr("y1", "0%")
+      .attr("x2", "0%")
+      .attr("y2", "100%");
+
+    gradient.append("stop")
+      .attr("offset", "0%")
+      .attr("stop-color", "#4cc9f0");
+
+    gradient.append("stop")
+      .attr("offset", "100%")
+      .attr("stop-color", "#4895ef");
+
+    // 添加X轴
+    svg.append("g")
+      .attr("transform", `translate(0,${height})`)
+      .call(d3.axisBottom(x))
+      .selectAll("text")
+      .attr("transform", "rotate(-45)")
+      .style("text-anchor", "end")
+      .style("font-size", "12px");
+
+    // 添加Y轴
+    svg.append("g")
+      .call(d3.axisLeft(y).ticks(5).tickFormat(d => `${d}cm`))
+      .style("font-size", "12px");
+
+    // 添加网格线
+    svg.append("g")
+      .attr("class", "grid")
+      .selectAll("line")
+      .data(y.ticks(5))
+      .enter()
+      .append("line")
+      .attr("x1", 0)
+      .attr("x2", width)
+      .attr("y1", d => y(d))
+      .attr("y2", d => y(d))
+      .attr("stroke", "rgba(0, 0, 0, 0.1)");
+
+    // 添加柱状图
+    svg.selectAll(".bar")
+      .data(speciesData)
+      .enter()
+      .append("rect")
+      .attr("class", "bar")
+      .attr("x", d => x(d.species_name) || 0)
+      .attr("y", height)
+      .attr("width", x.bandwidth())
+      .attr("height", 0)
+      .attr("fill", "url(#length-bar-gradient)")
+      .attr("rx", 4)
+      .attr("ry", 4)
+      .transition()
+      .duration(800)
+      .attr("y", d => y(d.length1))
+      .attr("height", d => height - y(d.length1));
+
+    // 添加数值标签
+    svg.selectAll(".label")
+      .data(speciesData)
+      .enter()
+      .append("text")
+      .attr("class", "label")
+      .attr("x", d => (x(d.species_name) || 0) + x.bandwidth() / 2)
+      .attr("y", d => y(d.length1) - 5)
+      .attr("text-anchor", "middle")
+      .style("font-size", "12px")
+      .style("fill", "#666")
+      .text(d => `${d.length1}cm`);
+
+    // 添加标题
+    svg.append("text")
+      .attr("x", width / 2)
+      .attr("y", -10)
+      .attr("text-anchor", "middle")
+      .style("font-size", "16px")
+      .style("font-weight", "bold")
+      .text("物种体长分布");
+
+    // 添加交互提示
+    const tooltip = d3.select("body").append("div")
+      .attr("class", "tooltip")
+      .style("position", "absolute")
+      .style("visibility", "hidden")
+      .style("background-color", "rgba(0, 0, 0, 0.8)")
+      .style("color", "white")
+      .style("padding", "8px")
+      .style("border-radius", "4px")
+      .style("font-size", "12px");
+
+    svg.selectAll(".bar")
+      .on("mouseover", function(event: any, d: any) {
+        const species = d as SpeciesData;
+        d3.select(this)
+          .transition()
+          .duration(200)
+          .attr("opacity", 0.8);
+
+        tooltip
+          .style("visibility", "visible")
+          .html(`
+            <div class="font-bold mb-1">${species.species_name}</div>
+            <div>体长: ${species.length1}cm</div>
+            <div>体重: ${species.weight}g</div>
+            <div>类别: ${species.category}</div>
+            <div>适宜温度: ${species.optimal_temp_range}</div>
+          `)
+          .style("left", (event.pageX + 10) + "px")
+          .style("top", (event.pageY - 28) + "px");
+      })
+      .on("mouseout", function() {
+        d3.select(this)
+          .transition()
+          .duration(200)
+          .attr("opacity", 1);
+        tooltip.style("visibility", "hidden");
+      });
+  }, [speciesData]);
+
   // 生成时间数据
   const generateTimeData = (range: number): DataPoint[] => {
     const data: DataPoint[] = [];
@@ -767,6 +1184,70 @@ export default function DataCenter() {
     };
   }, [timeRange]);
 
+  // 筛选物种数据
+  const filteredSpeciesData = speciesData
+    .filter(species => {
+      // 物种筛选
+      const matchesSpecies = selectedSpecies === 'all' || species.species_name === selectedSpecies;
+      
+      // 体长范围筛选
+      let matchesLength = true;
+      if (selectedLengthRange !== 'all') {
+        const length = species.length1;
+        switch (selectedLengthRange) {
+          case '0-10':
+            matchesLength = length >= 0 && length < 10;
+            break;
+          case '10-20':
+            matchesLength = length >= 10 && length < 20;
+            break;
+          case '20-30':
+            matchesLength = length >= 20 && length < 30;
+            break;
+          case '30-40':
+            matchesLength = length >= 30 && length < 40;
+            break;
+          case '40+':
+            matchesLength = length >= 40;
+            break;
+        }
+      }
+      
+      return matchesSpecies && matchesLength;
+    })
+    .slice(0, showAllSpecies ? undefined : 5);
+
+  // 添加导出CSV功能
+  const exportToCSV = () => {
+    // 准备CSV数据
+    const headers = ['物种名称', '类别', '体重(g)', '体长(cm)', '适宜温度范围'];
+    const csvData = filteredSpeciesData.map(species => [
+      species.species_name,
+      species.category,
+      species.weight,
+      species.length1,
+      species.optimal_temp_range
+    ]);
+
+    // 创建CSV内容
+    const csvContent = [
+      headers.join(','),
+      ...csvData.map(row => row.join(','))
+    ].join('\n');
+
+    // 创建Blob对象
+    const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+
+    // 创建下载链接
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `物种数据_${new Date().toLocaleDateString()}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <ProtectedRoute>
       <main className="p-8">
@@ -785,16 +1266,127 @@ export default function DataCenter() {
             </div>
           </div>
 
+          {/* 物种数据筛选器 */}
+          <div className="bg-white p-6 rounded-lg shadow-lg mb-8">
+            <div className="space-y-4">
+              <div className="flex gap-4 items-center">
+                <div className="flex-1">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    选择物种
+                    <span className="text-gray-500 text-xs ml-1">(选择特定物种查看详细数据)</span>
+                  </label>
+                  <select
+                    value={selectedSpecies}
+                    onChange={(e) => setSelectedSpecies(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value="all">所有物种</option>
+                    {uniqueSpecies.map(species => (
+                      <option key={species} value={species}>
+                        {species}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex-1">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    体长范围
+                    <span className="text-gray-500 text-xs ml-1">(按体长范围筛选数据)</span>
+                  </label>
+                  <select
+                    value={selectedLengthRange}
+                    onChange={(e) => setSelectedLengthRange(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    {lengthRanges.map(range => (
+                      <option key={range.value} value={range.value}>
+                        {range.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div className="flex justify-end mt-4 relative z-10 gap-4">
+                <button
+                  onClick={exportToCSV}
+                  className="inline-flex items-center px-6 py-2.5 bg-white text-gray-900 text-base font-bold rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors duration-200 shadow-md border border-gray-200"
+                  style={{ position: 'relative', zIndex: 20 }}
+                >
+                  <FaFileExport className="mr-2" />
+                  <span className="tracking-wide">导出数据</span>
+                </button>
+                <button
+                  onClick={() => setShowAllSpecies(!showAllSpecies)}
+                  className="inline-flex items-center px-6 py-2.5 bg-white text-gray-900 text-base font-bold rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors duration-200 shadow-md border border-gray-200"
+                  style={{ position: 'relative', zIndex: 20 }}
+                >
+                  <span className="mr-2 tracking-wide">{showAllSpecies ? '收起数据' : '显示全部数据'}</span>
+                  <svg 
+                    className={`w-5 h-5 transform transition-transform duration-200 ${showAllSpecies ? 'rotate-180' : ''}`} 
+                    fill="none" 
+                    stroke="currentColor" 
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+              </div>
+              <div className="text-sm text-gray-500 mt-4">
+                <p>提示：</p>
+                <ul className="list-disc list-inside space-y-1">
+                  <li>选择"所有物种"可查看所有数据</li>
+                  <li>选择特定物种可查看该物种的详细数据</li>
+                  <li>体长范围可帮助您筛选特定大小的物种</li>
+                  <li>默认显示前5条数据，点击"显示全部数据"可查看完整数据</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          {/* 物种数据部分 */}
+          <div className="bg-white p-6 rounded-lg shadow-lg mb-8">
+            <h2 className="text-xl font-semibold mb-6">物种数据分析</h2>
+            <div className="w-full h-[500px]">
+              <svg ref={speciesChartRef} className="w-full h-full"></svg>
+            </div>
+          </div>
+
+          {/* 物种数据表格 */}
+          <div className="bg-white p-6 rounded-lg shadow-lg mb-8">
+            <h2 className="text-xl font-semibold mb-6">物种详细数据</h2>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">物种名称</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">类别</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">体重(g)</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">体长(cm)</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">适宜温度范围</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {filteredSpeciesData.map((species, index) => (
+                    <tr key={`species-${species.species_id}-${index}`}>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{species.species_name}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{species.category}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{species.weight}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{species.length1}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{species.optimal_temp_range}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
           {/* 数据筛选器 */}
           <div className="bg-white p-6 rounded-lg shadow-lg mb-8">
             <div className="flex gap-4 items-center">
               <select
                 className="px-4 py-2 border border-gray-300 rounded-lg"
                 value={dateRange}
-                onChange={(e) => {
-                  console.log("日期范围改变:", e.target.value);
-                  setDateRange(e.target.value);
-                }}
+                onChange={(e) => setDateRange(e.target.value)}
               >
                 <option value="day">今日</option>
                 <option value="week">本周</option>
@@ -804,10 +1396,7 @@ export default function DataCenter() {
               <select
                 className="px-4 py-2 border border-gray-300 rounded-lg"
                 value={selectedMetric}
-                onChange={(e) => {
-                  console.log("指标改变:", e.target.value);
-                  setSelectedMetric(e.target.value);
-                }}
+                onChange={(e) => setSelectedMetric(e.target.value)}
               >
                 <option value="temperature">水温</option>
                 <option value="oxygen">溶解氧</option>
@@ -817,10 +1406,7 @@ export default function DataCenter() {
               <select
                 className="px-4 py-2 border border-gray-300 rounded-lg"
                 value={timeRange}
-                onChange={(e) => {
-                  console.log("时间范围改变:", e.target.value);
-                  setTimeRange(Number(e.target.value));
-                }}
+                onChange={(e) => setTimeRange(Number(e.target.value))}
               >
                 <option value="3">最近3天</option>
                 <option value="7">最近7天</option>
@@ -881,27 +1467,31 @@ export default function DataCenter() {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {[...Array(5)].map((_, index) => (
-                    <tr key={index}>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        2024-01-{String(index + 1).padStart(2, '0')}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {(23 + Math.random()).toFixed(1)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {(7 + Math.random()).toFixed(1)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {(7.5 + Math.random() * 0.5).toFixed(1)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
-                          正常
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
+                  {Array.from({ length: 5 }, (_, i) => {
+                    const date = new Date();
+                    date.setDate(date.getDate() - i);
+                    return (
+                      <tr key={`water-data-${date.toISOString()}`}>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {date.toLocaleDateString('zh-CN')}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {(23 + Math.random()).toFixed(1)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {(7 + Math.random()).toFixed(1)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {(7.5 + Math.random() * 0.5).toFixed(1)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                            正常
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

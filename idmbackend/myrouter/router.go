@@ -1,12 +1,14 @@
 package myrouter
 
 import (
-	"github.com/MoyInGxing/idm/handler"
-	"github.com/gin-gonic/gin"
 	"net/http"
+
+	"github.com/MoyInGxing/idm/handler"
+	"github.com/MoyInGxing/idm/middleware"
+	"github.com/gin-gonic/gin"
 )
 
-func SetupRouter(userHandler *handler.UserHandler, authMiddleware *gin.HandlerFunc, adminAuthMiddleware *gin.HandlerFunc) *gin.Engine {
+func SetupRouter(userHandler *handler.UserHandler, speciesHandler *handler.SpeciesHandler, authMiddleware *middleware.AuthMiddleware, adminAuthMiddleware *middleware.AdminAuthMiddleware) *gin.Engine {
 	r := gin.Default()
 
 	api := r.Group("/api")
@@ -15,13 +17,19 @@ func SetupRouter(userHandler *handler.UserHandler, authMiddleware *gin.HandlerFu
 		api.POST("/login", userHandler.Login)
 
 		// Protected routes
-		protected := api.Group("/users").Use(*authMiddleware)
+		protected := api.Group("/users").Use(authMiddleware.Handle())
 		{
 			protected.GET("/profile", userHandler.GetProfile)
 		}
 
+		// Species routes
+		species := api.Group("/species")
+		{
+			species.GET("", speciesHandler.GetAllSpecies)
+		}
+
 		// Admin protected routes
-		admin := api.Group("/admin").Use(*authMiddleware, *adminAuthMiddleware)
+		admin := api.Group("/admin").Use(authMiddleware.Handle(), adminAuthMiddleware.Handle())
 		{
 			// Add admin specific endpoints here
 			admin.GET("/dashboard", func(c *gin.Context) {

@@ -11,6 +11,7 @@ import (
 
 func SetupRouter(
 	userHandler *handler.UserHandler,
+	speciesHandler *handler.SpeciesHandler,
 	authMiddleware *middleware.AuthMiddleware,
 	adminAuthMiddleware *middleware.AdminAuthMiddleware,
 ) *gin.Engine {
@@ -39,6 +40,12 @@ func SetupRouter(
 
 		// 登录路由
 		api.POST("/login", userHandler.Login)
+
+		// 物种路由
+		species := api.Group("/species")
+		{
+			species.GET("", speciesHandler.GetAllSpecies)
+		}
 
 		// 需要认证的路由
 		authorized := api.Group("/users")

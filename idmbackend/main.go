@@ -24,15 +24,18 @@ func main() {
 
 	userRepo := database.NewGORMUserRepository(db)
 	sessionRepo := database.NewGORMSessionRepository(db)
+	speciesRepo := database.NewGORMSpeciesRepository(db)
 
 	userService := app.NewUserService(userRepo)
 	authService := app.NewAuthService(userRepo, sessionRepo, cfg)
+	speciesService := app.NewSpeciesService(speciesRepo)
 
 	userHandler := handler.NewUserHandler(userService, authService)
+	speciesHandler := handler.NewSpeciesHandler(speciesService)
 	authMiddleware := middleware.NewAuthMiddleware(authService)
 	adminAuthMiddleware := middleware.NewAdminAuthMiddleware(authService)
 
-	r := myrouter.SetupRouter(userHandler, authMiddleware, adminAuthMiddleware)
+	r := myrouter.SetupRouter(userHandler, speciesHandler, authMiddleware, adminAuthMiddleware)
 
 	if err := r.Run(":8080"); err != nil {
 		log.Fatalf("Failed to run server: %v", err)
