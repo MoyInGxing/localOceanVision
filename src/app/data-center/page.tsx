@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import * as d3 from 'd3';
 import ProtectedRoute from '../components/ProtectedRoute';
 import { FaDownload, FaFilter, FaSearch, FaFileExport } from 'react-icons/fa';
+import Script from 'next/script';
 
 // 定义数据类型
 interface DataPoint {
@@ -57,6 +58,25 @@ interface SpeciesData {
   optimal_temp_range: string;
 }
 
+// 定义高德地图相关类型
+interface AMapPoint {
+  lng: number;
+  lat: number;
+}
+
+interface LocationData {
+  address: string;
+  point: AMapPoint;
+}
+
+// 扩展Window接口
+declare global {
+  interface Window {
+    AMap: any;
+    initAMap: () => void;
+  }
+}
+
 export default function DataCenter() {
   console.log("DataCenter组件开始渲染");
   
@@ -73,12 +93,23 @@ export default function DataCenter() {
   const [selectedSpecies, setSelectedSpecies] = useState('all');
   const [selectedLengthRange, setSelectedLengthRange] = useState('all');
   
+  // 添加高德地图相关状态
+  const [mapLoaded, setMapLoaded] = useState(false);
+  const [locations, setLocations] = useState<LocationData[]>([]);
+  const [mapInstance, setMapInstance] = useState<any>(null);
+  
+  // 添加流域筛选相关状态
+  const [selectedBasin, setSelectedBasin] = useState('上海市-长江流域');
+  const [allLocations, setAllLocations] = useState<string[]>([]);
+  const [filteredLocations, setFilteredLocations] = useState<string[]>([]);
+  
   // 引用DOM元素
   const temperatureChartRef = useRef<SVGSVGElement | null>(null);
   const productionChartRef = useRef<SVGSVGElement | null>(null);
   const chinaMapRef = useRef<SVGSVGElement | null>(null);
   const speciesChartRef = useRef<SVGSVGElement | null>(null);
   const speciesLengthChartRef = useRef<SVGSVGElement | null>(null);
+  const amapRef = useRef<HTMLDivElement | null>(null);
   
   // 获取物种数据
   useEffect(() => {
@@ -1248,9 +1279,203 @@ export default function DataCenter() {
     document.body.removeChild(link);
   };
 
+  // 地理编码服务函数
+  const geocodeAddress = async (address: string): Promise<AMapPoint | null> => {
+    try {
+      // 解析地址格式：省份-流域-具体位置
+      const [province, basin, location] = address.split('-');
+      
+      // 构建更完整的地址
+      const formattedAddress = `${province}${location}`;
+      console.log('正在解析地址:', formattedAddress);
+      
+      const response = await fetch(
+        `https://restapi.amap.com/v3/geocode/geo?address=${encodeURIComponent(formattedAddress)}&key=96cdd7a8bceea5f8dc25a2d8c32c98b8&city=${province}`
+      );
+      
+      const result = await response.json();
+      console.log('地理编码结果:', result);
+      
+      if (result.status === '1' && result.geocodes && result.geocodes.length > 0) {
+        const location = result.geocodes[0].location.split(',');
+        console.log('解析成功，坐标:', location);
+        return {
+          lng: parseFloat(location[0]),
+          lat: parseFloat(location[1])
+        };
+      } else {
+        // 如果第一次解析失败，尝试使用更简化的地址
+        console.log('尝试使用简化地址:', location);
+        const fallbackResponse = await fetch(
+          `https://restapi.amap.com/v3/geocode/geo?address=${encodeURIComponent(location)}&key=96cdd7a8bceea5f8dc25a2d8c32c98b8&city=${province}`
+        );
+        
+        const fallbackResult = await fallbackResponse.json();
+        console.log('简化地址解析结果:', fallbackResult);
+        
+        if (fallbackResult.status === '1' && fallbackResult.geocodes && fallbackResult.geocodes.length > 0) {
+          const location = fallbackResult.geocodes[0].location.split(',');
+          console.log('简化地址解析成功，坐标:', location);
+          return {
+            lng: parseFloat(location[0]),
+            lat: parseFloat(location[1])
+          };
+        }
+      }
+      
+      console.error(`无法解析地址: ${formattedAddress}`);
+      return null;
+    } catch (error) {
+      console.error('地理编码请求失败:', error);
+      return null;
+    }
+  };
+
+  // 添加位置点到地图
+  const addLocationsToMap = async (addresses: string[]) => {
+    if (!mapInstance) {
+      console.error('地图实例未初始化');
+      return;
+    }
+
+    // 清除现有标记
+    mapInstance.clearMap();
+    
+    console.log('开始添加位置点:', addresses);
+    const newLocations: LocationData[] = [];
+    
+    for (const address of addresses) {
+      console.log('处理地址:', address);
+      const point = await geocodeAddress(address);
+      if (point) {
+        console.log('添加标记点:', point);
+        newLocations.push({ address, point });
+        
+        // 创建标记
+        const marker = new window.AMap.Marker({
+          position: [point.lng, point.lat],
+          title: address.split('-')[2], // 只显示具体位置名称
+          animation: 'AMAP_ANIMATION_DROP',
+          offset: new window.AMap.Pixel(-13, -30)
+        });
+
+        // 创建信息窗体
+        const infoWindow = new window.AMap.InfoWindow({
+          content: `<div class="p-2">
+            <h3 class="font-bold">${address.split('-')[2]}</h3>
+            <p>经度: ${point.lng.toFixed(6)}</p>
+            <p>纬度: ${point.lat.toFixed(6)}</p>
+          </div>`,
+          offset: new window.AMap.Pixel(0, -30)
+        });
+
+        // 绑定点击事件
+        marker.on('click', () => {
+          infoWindow.open(mapInstance, marker.getPosition());
+        });
+
+        mapInstance.add(marker);
+      }
+    }
+
+    setLocations(newLocations);
+  };
+
+  // 示例：添加位置
+  useEffect(() => {
+    if (mapLoaded && filteredLocations.length > 0) {
+      console.log('地图已加载，开始添加位置点');
+      addLocationsToMap(filteredLocations);
+    }
+  }, [mapLoaded, filteredLocations]);
+
+  // 初始化高德地图
+  const initAMap = () => {
+    if (!amapRef.current || !window.AMap) return;
+
+    const map = new window.AMap.Map(amapRef.current, {
+      zoom: 11,
+      center: [121.4737, 31.2304], // 上海市中心坐标
+      viewMode: '3D'
+    });
+
+    // 加载所有需要的插件
+    window.AMap.plugin([
+      'AMap.Scale',
+      'AMap.ToolBar',
+      'AMap.Geocoder',
+      'AMap.InfoWindow'
+    ], () => {
+      // 添加地图控件
+      map.addControl(new window.AMap.Scale());
+      map.addControl(new window.AMap.ToolBar({
+        position: 'RB'
+      }));
+    });
+
+    setMapInstance(map);
+  };
+
+  // 加载高德地图API
+  useEffect(() => {
+    const loadAMap = () => {
+      if (window.AMap) {
+        setMapLoaded(true);
+        initAMap();
+      }
+    };
+
+    if (typeof window !== 'undefined') {
+      if (window.AMap) {
+        loadAMap();
+      } else {
+        window.initAMap = loadAMap;
+      }
+    }
+  }, []);
+
+  // 在useEffect中加载位置数据
+  useEffect(() => {
+    const loadLocations = async () => {
+      try {
+        const response = await fetch('/dataset/all_location.txt');
+        const text = await response.text();
+        const locations = text.split('\n').filter(line => line.trim());
+        setAllLocations(locations);
+        
+        // 默认显示上海的长江流域数据
+        const defaultLocations = locations.filter(loc => loc.startsWith('上海市-长江流域'));
+        setFilteredLocations(defaultLocations);
+      } catch (error) {
+        console.error('加载位置数据失败:', error);
+      }
+    };
+    
+    loadLocations();
+  }, []);
+
+  // 处理流域选择变化
+  const handleBasinChange = (basin: string) => {
+    setSelectedBasin(basin);
+    const filtered = allLocations.filter(loc => loc.startsWith(basin));
+    setFilteredLocations(filtered);
+  };
+
+  // 获取所有唯一的流域
+  const uniqueBasins = Array.from(new Set(allLocations.map(loc => {
+    const parts = loc.split('-');
+    return parts.slice(0, 2).join('-');
+  })));
+
   return (
     <ProtectedRoute>
       <main className="p-8">
+        {/* 添加高德地图API脚本 */}
+        <Script
+          src={`https://webapi.amap.com/maps?v=2.0&key=96cdd7a8bceea5f8dc25a2d8c32c98b8&callback=initAMap`}
+          strategy="afterInteractive"
+        />
+        
         <div className="max-w-7xl mx-auto">
           <div className="flex justify-between items-center mb-8">
             <h1 className="text-3xl font-bold text-gray-900">数据中心</h1>
@@ -1506,6 +1731,48 @@ export default function DataCenter() {
                 className="w-full h-full"
                 style={{ border: '1px solid #eee' }}
               ></svg>
+            </div>
+          </div>
+
+          {/* 添加高德地图容器 */}
+          <div className="bg-white p-6 rounded-lg shadow-lg mb-8">
+            <h2 className="text-xl font-semibold mb-6">地理位置分布</h2>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                选择流域
+              </label>
+              <select
+                value={selectedBasin}
+                onChange={(e) => handleBasinChange(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              >
+                {uniqueBasins.map(basin => (
+                  <option key={basin} value={basin}>
+                    {basin}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div 
+              ref={amapRef} 
+              className="w-full h-[500px]"
+              style={{ border: '1px solid #eee' }}
+            ></div>
+            <div className="mt-4">
+              <h3 className="text-lg font-medium mb-2">当前流域监测点列表：</h3>
+              <div className="max-h-[300px] overflow-y-auto">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                  {filteredLocations.map((location, index) => (
+                    <div key={index} className="p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                      <div className="font-medium text-gray-900">{location.split('-')[2]}</div>
+                      <div className="text-sm text-gray-500">{location.split('-')[0]}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="mt-2 text-sm text-gray-500">
+                共 {filteredLocations.length} 个监测点
+              </div>
             </div>
           </div>
         </div>
