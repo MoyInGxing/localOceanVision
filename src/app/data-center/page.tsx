@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import * as d3 from 'd3';
 import ProtectedRoute from '../components/ProtectedRoute';
-import { FaDownload, FaFilter, FaSearch, FaFileExport } from 'react-icons/fa';
+import { FaDownload, FaFilter, FaSearch, FaFileExport, FaExclamationTriangle } from 'react-icons/fa';
 import Script from 'next/script';
 
 // 定义数据类型
@@ -102,6 +102,11 @@ export default function DataCenter() {
   const [selectedBasin, setSelectedBasin] = useState('上海市-长江流域');
   const [allLocations, setAllLocations] = useState<string[]>([]);
   const [filteredLocations, setFilteredLocations] = useState<string[]>([]);
+
+  // --- 新增：报警弹窗相关状态 ---
+  const [showAlert, setShowAlert] = useState(false);
+  const [alertStatus, setAlertStatus] = useState<WaterQualityStatus>('normal');
+  const [alertMessage, setAlertMessage] = useState('');
   
   // 引用DOM元素
   const temperatureChartRef = useRef<SVGSVGElement | null>(null);
@@ -142,6 +147,39 @@ export default function DataCenter() {
 
     fetchSpeciesData();
   }, []);
+
+  // --- 新增：模拟实时水质监测并触发报警 ---
+  useEffect(() => {
+    const checkWaterQuality = () => {
+      // 模拟生成随机水质数据
+      // 提高温度和浊度超出正常范围的概率以触发报警
+      const temperature = 15 + Math.random() * 20; // 15-35°C
+      const ph = 6.5 + Math.random() * 2.5;     // 6.5-9.0
+      const oxygen = 2 + Math.random() * 8;       // 2-10mg/L
+      const turbidity = 10 + Math.random() * 90;  // 10-100NTU
+
+      const status = getStatus(temperature, ph, oxygen, turbidity);
+      console.log(`模拟水质监测: T=${temperature.toFixed(1)}, pH=${ph.toFixed(1)}, O2=${oxygen.toFixed(1)}, Turbidity=${turbidity.toFixed(1)}, Status=${status}`);
+
+      // 如果状态为 'warning' 或 'error' 并且当前没有显示报警，则触发报警
+      if ((status === 'warning' || status === 'error') && !showAlert) {
+        setAlertStatus(status);
+        const messages = [];
+        if (temperature > 32 || temperature < 10) messages.push(`温度异常: ${temperature.toFixed(1)}°C`);
+        if (ph > 9.5 || ph < 5.5) messages.push(`pH值异常: ${ph.toFixed(1)}`);
+        if (oxygen < 2) messages.push(`溶解氧过低: ${oxygen.toFixed(1)}mg/L`);
+        if (turbidity > 95) messages.push(`浊度过高: ${turbidity.toFixed(1)}NTU`);
+        setAlertMessage(messages.join(', '));
+        setShowAlert(true);
+      }
+    };
+
+    // 每10秒检查一次
+    const intervalId = setInterval(checkWaterQuality, 1000);
+
+    // 组件卸载时清除定时器
+    return () => clearInterval(intervalId);
+  }, [showAlert]); // 依赖showAlert，以便在关闭后可以再次触发
 
   // 获取所有唯一的物种名称
   const uniqueSpecies = Array.from(new Set(speciesData.map(s => s.species_name)));
@@ -1470,6 +1508,41 @@ export default function DataCenter() {
   return (
     <ProtectedRoute>
       <main className="p-8">
+        {/* --- 报警弹窗的JSX渲染 (按钮颜色已更新) --- */}
+        {showAlert && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className={`bg-white rounded-lg shadow-2xl p-6 max-w-sm w-full mx-4 transform transition-all duration-300 ease-out ${showAlert ? 'scale-100 opacity-100' : 'scale-95 opacity-0'}`}>
+              <div className="flex items-start">
+                <div className={`flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full ${alertStatus === 'error' ? 'bg-red-100' : 'bg-yellow-100'} sm:mx-0 sm:h-10 sm:w-10`}>
+                  <FaExclamationTriangle className={`${alertStatus === 'error' ? 'text-red-600' : 'text-yellow-600'} h-6 w-6`} />
+                </div>
+                <div className="ml-4 text-left">
+                  <h3 className="text-lg leading-6 font-bold text-gray-900" id="modal-title">
+                    {alertStatus === 'error' ? '水质异常报警' : '水质警告'}
+                  </h3>
+                  <div className="mt-2">
+                    <p className="text-sm text-gray-600">
+                      检测到水质指标出现异常，请立即检查并处理。
+                    </p>
+                    <p className="text-sm text-red-600 font-semibold mt-2">
+                      异常详情: {alertMessage}
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <div className="mt-5 sm:mt-4 sm:flex sm:flex-row-reverse">
+                <button
+                  type="button"
+                  className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:ml-3 sm:w-auto sm:text-sm"
+                  onClick={() => setShowAlert(false)}
+                >
+                  我知道了
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* 添加高德地图API脚本 */}
         <Script
           src={`https://webapi.amap.com/maps?v=2.0&key=96cdd7a8bceea5f8dc25a2d8c32c98b8&callback=initAMap`}
@@ -1599,6 +1672,7 @@ export default function DataCenter() {
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{species.length1}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{species.optimal_temp_range}</td>
                     </tr>
+
                   ))}
                 </tbody>
               </table>
