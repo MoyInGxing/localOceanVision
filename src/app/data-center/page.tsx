@@ -178,24 +178,55 @@ export default function DataCenter() {
       .append("g")
       .attr("transform", `translate(${margin.left},${margin.top})`);
 
+    // 使用筛选后的数据
+    const filteredData = speciesData.filter(species => {
+      // 物种筛选
+      const matchesSpecies = selectedSpecies === 'all' || species.species_name === selectedSpecies;
+      
+      // 体长范围筛选
+      let matchesLength = true;
+      if (selectedLengthRange !== 'all') {
+        const length = species.length1;
+        switch (selectedLengthRange) {
+          case '0-10':
+            matchesLength = length >= 0 && length < 10;
+            break;
+          case '10-20':
+            matchesLength = length >= 10 && length < 20;
+            break;
+          case '20-30':
+            matchesLength = length >= 20 && length < 30;
+            break;
+          case '30-40':
+            matchesLength = length >= 30 && length < 40;
+            break;
+          case '40+':
+            matchesLength = length >= 40;
+            break;
+        }
+      }
+      
+      return matchesSpecies && matchesLength;
+    });
+
     // 创建X轴比例尺
     const x = d3.scaleLinear()
-      .domain([0, d3.max(speciesData, d => d.length1) || 0])
+      .domain([0, d3.max(filteredData, d => d.length1) || 0])
       .range([0, width]);
 
     // 创建Y轴比例尺
     const y = d3.scaleLinear()
-      .domain([0, d3.max(speciesData, d => d.weight) || 0])
+      .domain([0, d3.max(filteredData, d => d.weight) || 0])
       .range([height, 0]);
 
     // 创建颜色比例尺
-    const colorScale = d3.scaleOrdinal()
-      .domain(speciesData.map(d => d.species_name))
+    const colorScale = d3.scaleOrdinal<string>()
+      .domain(filteredData.map(d => d.species_name))
       .range(d3.schemeCategory10);
 
     // 创建大小比例尺
     const sizeScale = d3.scaleLinear()
-      .domain([0, d3.max(speciesData, d => d.weight / 30 + d.length1) || 0])
+      .domain([0, d3.max(filteredData, d => d.weight / 30 + d.length1) || 0])
       .range([5, 15]);
 
     // 添加X轴
@@ -224,7 +255,7 @@ export default function DataCenter() {
 
     // 添加散点
     svg.selectAll("circle")
-      .data(speciesData)
+      .data(filteredData)
       .enter()
       .append("circle")
       .attr("cx", d => x(d.length1))
@@ -287,7 +318,7 @@ export default function DataCenter() {
       .style("fill", "#4a5568")
       .text("物种图例");
 
-    const uniqueSpecies = Array.from(new Set(speciesData.map(d => d.species_name)));
+    const uniqueSpecies = Array.from(new Set(filteredData.map(d => d.species_name)));
     uniqueSpecies.forEach((species, i) => {
       const legendRow = legend.append("g")
         .attr("transform", `translate(0, ${i * 20})`);
@@ -347,7 +378,7 @@ export default function DataCenter() {
           .attr("stroke-width", 1);
         tooltip.style("visibility", "hidden");
       });
-  }, [speciesData]);
+  }, [speciesData, selectedSpecies, selectedLengthRange]); // 添加依赖项
 
   // 创建物种体长分布图
   useEffect(() => {
