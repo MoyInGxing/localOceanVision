@@ -1,15 +1,18 @@
 package myrouter
 
 import (
-	"github.com/gin-gonic/gin"
-	"github.com/gin-contrib/cors"
+	"time"
+
 	"github.com/MoyInGxing/idm/handler"
 	"github.com/MoyInGxing/idm/middleware"
-	"time"
+	"github.com/gin-contrib/cors"
+	"github.com/gin-gonic/gin"
 )
 
 func SetupRouter(
 	userHandler *handler.UserHandler,
+	speciesHandler *handler.SpeciesHandler,
+	fishRecognitionHandler gin.HandlerFunc, // 新增鱼类识别处理函数
 	authMiddleware *middleware.AuthMiddleware,
 	adminAuthMiddleware *middleware.AdminAuthMiddleware,
 ) *gin.Engine {
@@ -39,6 +42,15 @@ func SetupRouter(
 		// 登录路由
 		api.POST("/login", userHandler.Login)
 
+		// 添加鱼类识别路由 - 不需要认证
+		api.POST("/fish-recognition", fishRecognitionHandler) // 使用传入的 handler
+
+		// 物种路由
+		species := api.Group("/species")
+		{
+			species.GET("", speciesHandler.GetAllSpecies)
+		}
+
 		// 需要认证的路由
 		authorized := api.Group("/users")
 		authorized.Use(authMiddleware.Handle())
@@ -51,8 +63,11 @@ func SetupRouter(
 		admin.Use(authMiddleware.Handle(), adminAuthMiddleware.Handle())
 		{
 			admin.GET("/dashboard", userHandler.GetAdminDashboard)
+			admin.GET("/users", userHandler.GetAllUsers)
+			admin.DELETE("/users/:id", userHandler.DeleteUser)
+			admin.PUT("/users/:id/role", userHandler.UpdateUserRole)
 		}
 	}
 
 	return r
-} 
+}

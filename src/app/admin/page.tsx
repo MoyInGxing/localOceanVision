@@ -2,7 +2,7 @@
 
 import { useAuth } from '../context/AuthContext';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 interface User {
   id: string;
@@ -15,26 +15,102 @@ interface User {
 export default function AdminDashboard() {
   const { user } = useAuth();
   const router = useRouter();
-  const [users, setUsers] = useState<User[]>([
-    { id: '1', username: 'admin', role: 'admin' },
-    { id: '2', username: 'user', role: 'user' },
-  ]);
+  const [users, setUsers] = useState<User[]>([]);
   const [activeTab, setActiveTab] = useState('users');
+  const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    fetchUsers();
+  }, []);
+
+  const fetchUsers = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('未找到认证token');
+      }
+
+      console.log('正在获取用户列表，使用token:', token);
+      
+      const response = await fetch('http://localhost:8080/api/admin/users', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      console.log('服务器响应状态:', response.status);
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || '获取用户列表失败');
+      }
+
+      const data = await response.json();
+      console.log('获取到的用户数据:', data);
+      
+      setUsers(data.users);
+    } catch (err) {
+      console.error('获取用户列表时出错:', err);
+      setError(err instanceof Error ? err.message : '获取用户列表失败');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   if (!user || user.role !== 'admin') {
     router.push('/login');
     return null;
   }
 
-  const handleDeleteUser = (userId: string) => {
-    setUsers(users.filter(u => u.id !== userId));
+  const handleDeleteUser = async (userId: string) => {
+    try {
+      const response = await fetch(`http://localhost:8080/api/admin/users/${userId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        },
+      });
+      if (!response.ok) {
+        throw new Error('删除用户失败');
+      }
+      setUsers(users.filter(u => u.id !== userId));
+    } catch (err) {
+      setError('删除用户失败');
+      console.error('Error deleting user:', err);
+    }
   };
 
-  const handleRoleChange = (userId: string, newRole: string) => {
-    setUsers(users.map(u => 
-      u.id === userId ? { ...u, role: newRole } : u
-    ));
+  const handleRoleChange = async (userId: string, newRole: string) => {
+    try {
+      const response = await fetch(`http://localhost:8080/api/admin/users/${userId}/role`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ role: newRole }),
+      });
+      if (!response.ok) {
+        throw new Error('更新用户角色失败');
+      }
+      setUsers(users.map(u => 
+        u.id === userId ? { ...u, role: newRole } : u
+      ));
+    } catch (err) {
+      setError('更新用户角色失败');
+      console.error('Error updating user role:', err);
+    }
   };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-100 py-12 px-4 sm:px-6 lg:px-8">
@@ -66,6 +142,12 @@ export default function AdminDashboard() {
           </div>
 
           <div className="p-6">
+            {error && (
+              <div className="mb-4 p-4 bg-red-50 text-red-700 rounded-lg">
+                {error}
+              </div>
+            )}
+            
             {activeTab === 'users' ? (
               <div className="space-y-4">
                 <h2 className="text-lg font-medium text-gray-900">用户列表</h2>

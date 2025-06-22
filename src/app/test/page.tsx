@@ -43,6 +43,7 @@ export default function TestPage() {
       // Try to fetch user profile if token exists
       testProfile();
     }
+    // testProfile为本地函数，不会变，无需加入依赖
   }, []);
 
   const addTestResult = (result: TestResult) => {
@@ -326,10 +327,10 @@ export default function TestPage() {
       <div style={{ marginBottom: '20px', padding: '15px', backgroundColor: '#f0f9ff', borderRadius: '8px' }}>
         <h2 style={{ fontSize: '18px', marginBottom: '10px' }}>测试步骤：</h2>
         <ol style={{ marginLeft: '20px' }}>
-          <li style={{ marginBottom: '5px' }}>点击"测试注册"按钮创建新用户</li>
+          <li style={{ marginBottom: '5px' }}>点击&ldquo;测试注册&rdquo;按钮创建新用户</li>
           <li style={{ marginBottom: '5px' }}>系统会自动尝试登录</li>
           <li style={{ marginBottom: '5px' }}>登录成功后，会自动获取用户信息</li>
-          <li style={{ marginBottom: '5px' }}>点击"测试管理员登录"按钮测试管理员功能</li>
+          <li style={{ marginBottom: '5px' }}>点击&ldquo;测试管理员登录&rdquo;按钮测试管理员功能</li>
           <li>最后可以测试管理员面板</li>
         </ol>
       </div>

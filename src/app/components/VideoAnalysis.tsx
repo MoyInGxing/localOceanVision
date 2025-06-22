@@ -406,18 +406,13 @@ export default function VideoAnalysis({ isActive, cameraId }: VideoAnalysisProps
   };
 
   // 计算检测目标的移动距离
-  const calculateMovement = (current: Detection[], last: Detection[]): number => {
-    if (last.length === 0) return 0;
-    
+  const calculateMovement = (current: Detection[] = [], last: Detection[] = []): number => {
     let totalMovement = 0;
     let matchedCount = 0;
-
-    // 为每个当前检测找到最近的上一帧检测
-    current.forEach(curr => {
+    current.forEach((curr: Detection) => {
       let minDistance = Infinity;
-      let bestMatch: Detection | null = null;
-
-      last.forEach(prev => {
+      let bestMatch: Detection | undefined = undefined;
+      (last as Detection[]).forEach((prev: Detection) => {
         const [x1, y1] = curr.bbox;
         const [x2, y2] = prev.bbox;
         const dx = x1 - x2;
@@ -431,9 +426,10 @@ export default function VideoAnalysis({ isActive, cameraId }: VideoAnalysisProps
       });
 
       // 如果找到合适的匹配（距离不太远），计算移动距离
-      if (bestMatch && minDistance < 100) { // 设置一个合理的最大匹配距离
+      if (bestMatch !== undefined && minDistance < 100) { // 设置一个合理的最大匹配距离
         const [x1, y1] = curr.bbox;
-        const [x2, y2] = bestMatch.bbox;
+        const match = bestMatch as Detection;
+        const [x2, y2] = match.bbox;
         const dx = x1 - x2;
         const dy = y1 - y2;
         totalMovement += Math.sqrt(dx * dx + dy * dy);

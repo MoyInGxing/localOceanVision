@@ -38,9 +38,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
+        console.log("AuthProvider: 开始验证会话");
         const validateSession = async () => {
             try {
                 const storedUser = localStorage.getItem('user');
+                console.log("AuthProvider: 从localStorage获取用户信息", storedUser);
                 if (storedUser) {
                     const userData = JSON.parse(storedUser);
                     // 验证会话是否有效
@@ -53,19 +55,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                     });
 
                     if (response.ok) {
+                        console.log("AuthProvider: 会话验证成功，设置用户信息");
                         setUser(userData);
                     } else {
-                        // 如果会话无效，清除存储的用户信息
+                        console.log("AuthProvider: 会话验证失败，清除用户信息");
                         localStorage.removeItem('user');
                         setUser(null);
                     }
+                } else {
+                    console.log("AuthProvider: 未找到存储的用户信息");
                 }
             } catch (error) {
-                console.error('会话验证失败:', error);
+                console.error('AuthProvider: 会话验证失败:', error);
                 localStorage.removeItem('user');
                 setUser(null);
             } finally {
                 setIsLoading(false);
+                console.log("AuthProvider: 会话验证完成", { user, isLoading });
             }
         };
 
@@ -74,7 +80,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const login = async (username: string, password: string) => {
         try {
-            const response = await fetch('/api/auth/login', {
+            console.log("AuthProvider: 开始登录");
+            const response = await fetch('/api/login', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -83,21 +90,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             });
 
             if (!response.ok) {
-                throw new Error('登录失败');
+                const data = await response.json();
+                throw new Error(data.error || '登录失败');
             }
 
-            const userData = await response.json();
-            setUser(userData);
-            localStorage.setItem('user', JSON.stringify(userData));
+            const data = await response.json();
+            console.log("AuthProvider: 登录成功，设置用户信息");
+            setUser(data.user);
+            localStorage.setItem('user', JSON.stringify(data.user));
+            localStorage.setItem('token', data.token);
         } catch (error) {
-            console.error('登录错误:', error);
+            console.error('AuthProvider: 登录错误:', error);
             throw error;
         }
     };
 
     const register = async (username: string, password: string, email: string, phone: string) => {
         try {
-            const response = await fetch('/api/auth/register', {
+            console.log("AuthProvider: 开始注册");
+            const response = await fetch('/api/register', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -106,29 +117,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             });
 
             if (!response.ok) {
-                throw new Error('注册失败');
+                const data = await response.json();
+                throw new Error(data.error || '注册失败');
             }
+            console.log("AuthProvider: 注册成功");
         } catch (error) {
+            console.error('AuthProvider: 注册错误:', error);
             throw error;
         }
     };
 
     const logout = () => {
+        console.log("AuthProvider: 开始登出");
         setUser(null);
         localStorage.removeItem('user');
+        localStorage.removeItem('token');
+        console.log("AuthProvider: 登出完成");
     };
 
     const updateUser = async (userData: Partial<User>) => {
         try {
-            // 这里应该调用后端 API 更新用户信息
-            // 目前仅更新本地状态
+            console.log("AuthProvider: 开始更新用户信息");
             if (user) {
                 const updatedUser = { ...user, ...userData };
                 setUser(updatedUser);
                 localStorage.setItem('user', JSON.stringify(updatedUser));
+                console.log("AuthProvider: 用户信息更新成功");
             }
         } catch (error) {
-            console.error('更新用户信息失败:', error);
+            console.error('AuthProvider: 更新用户信息失败:', error);
             throw error;
         }
     };
@@ -145,9 +162,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
 
     if (isLoading) {
+        console.log("AuthProvider: 正在加载中...");
         return <div className="min-h-screen flex items-center justify-center">加载中...</div>;
     }
 
+    console.log("AuthProvider: 渲染完成", { user, isLoggedIn: !!user, isAdmin: user?.role === 'admin' });
     return (
         <AuthContext.Provider value={value}>
             {children}

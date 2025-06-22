@@ -1,11 +1,10 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import ProtectedRoute from '../components/ProtectedRoute'; // 假设此组件存在于您的项目中
-import { FaBrain, FaChartLine, FaRobot, FaClipboardCheck, FaTimes, FaLightbulb } from 'react-icons/fa'; // Added FaLightbulb
-import { FiSun, FiCloud, FiCloudRain, FiCloudDrizzle, FiWind, FiThermometer } from 'react-icons/fi'; // 天气图标
+import ProtectedRoute from '../components/ProtectedRoute';
+import { FaBrain, FaChartLine, FaRobot, FaClipboardCheck, FaTimes, FaLightbulb, FaFish, FaUpload, FaCheck } from 'react-icons/fa';
+import { FiSun, FiCloud, FiCloudRain, FiCloudDrizzle, FiWind, FiThermometer } from 'react-icons/fi';
 import { Line, Bar } from 'react-chartjs-2';
-import Image from 'next/image';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -41,94 +40,53 @@ interface WeatherData {
   description: string;
 }
 
-// 可能的天气描述和对应的图标
-const weatherOptions = [
-  { description: '晴朗', icon: <FiSun className="w-8 h-8 text-yellow-400" /> },
-  { description: '多云', icon: <FiCloud className="w-8 h-8 text-gray-400" /> },
-  { description: '小雨', icon: <FiCloudRain className="w-8 h-8 text-blue-400" /> },
-  { description: '阵雨', icon: <FiCloudDrizzle className="w-8 h-8 text-blue-300" /> },
-  { description: '有风', icon: <FiWind className="w-8 h-8 text-gray-500" /> },
-  { description: '阴天', icon: <FiCloud className="w-8 h-8 text-gray-400" /> }, // 阴天
-  { description: '雷阵雨', icon: <FiCloudRain className="w-8 h-8 text-blue-500" /> }, // 雷阵雨
-  { description: '多云转晴', icon: <FiCloud className="w-8 h-8 text-gray-400" /> }, // 多云转晴，可以用多云图标
-  { description: '晴转多云', icon: <FiSun className="w-8 h-8 text-yellow-400" /> }, // 晴转多云，可以用晴天图标
-];
-
-// 获取从当前日期开始的未来7天的日期 (月/日)
-const getNextSevenDays = () => {
-  const nextSevenDates = [];
-  const today = new Date();
-
-  for (let i = 0; i < 7; i++) {
-    const nextDay = new Date(today); // 创建一个新日期对象，避免修改 today
-    nextDay.setDate(today.getDate() + i); // 设置为 i 天后的日期
-
-    const month = (nextDay.getMonth() + 1).toString().padStart(2, '0'); // 月份从0开始，加1，并补零
-    const day = nextDay.getDate().toString().padStart(2, '0');     // 日期补零
-
-    nextSevenDates.push(`${month}/${day}`);
-  }
-  return nextSevenDates;
-};
-
-
 // 定义分析类型
-type AnalysisType = 'growth' | 'disease' | 'feeding' | 'environment';
+type AnalysisType = 'growth' | 'disease' | 'feeding' | 'environment' | 'recognition';
 
 // 定义图表数据和建议的接口
 interface AnalysisChartInfo {
   data: ChartData<'line'> | ChartData<'bar'>;
   type: 'line' | 'bar';
   title: string;
-  adviceText: string; // 新增建议文本字段
+  adviceText: string;
+  // 新增识别相关字段
+  recognitionResult?: {
+    name: string;
+    score: number;
+    description?: string;
+  } | null;
+  imagePreview?: string | null;
 }
 
-
+// 新增：鱼类识别结果接口
+/* interface FishRecognitionResult {
+  name: string;
+  score: number;
+  description: string;
+} */
 
 export default function Intelligence() {
   const [selectedAnalysis, setSelectedAnalysis] = useState<AnalysisType | null>(null);
   const [weatherForecast, setWeatherForecast] = useState<WeatherData[]>([]);
-  const chartSectionRef = useRef<HTMLDivElement>(null); // Ref for scrolling to chart
+  // const [isUploading, setIsUploading] = useState(false);
+  const [recognitionStatus, setRecognitionStatus] = useState<'idle' | 'uploading' | 'success' | 'error'>('idle');
+  const [recognitionError, setRecognitionError] = useState<string | null>(null);
+  const chartSectionRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-   // 模拟获取天气数据
-  useEffect(() => {
-    const generateRandomWeatherData = (): WeatherData[] => {
-      const days = getNextSevenDays(); // 获取接下来7天的日期字符串 (月/日)
-      const randomData: WeatherData[] = [];
-
-      for (let i = 0; i < 7; i++) {
-        // 随机选择一个天气选项 (描述和图标)
-        const randomOption = weatherOptions[Math.floor(Math.random() * weatherOptions.length)];
-
-        // 随机生成温度，例如高温在 20-35°C，低温在 10-25°C
-        // 确保低温低于高温
-        let tempHigh = Math.floor(Math.random() * (35 - 20 + 1)) + 20; // 高温在 20-35
-        let tempLow = Math.floor(Math.random() * (25 - 10 + 1)) + 10; // 低温在 10-25
-
-        // 如果生成的低温大于等于高温，则重新生成低温
-        while (tempLow >= tempHigh) {
-          // 确保低温在 10 到 高温-5 之间，避免温差过小或低温过低
-          tempLow = Math.floor(Math.random() * (tempHigh - 5 - 10 + 1)) + 10;
-          if (tempLow < 10) tempLow = 10; // 确保低温不低于10
-        }
-
-
-        randomData.push({
-          day: days[i], // 使用生成的 "月/日" 字符串
-          icon: randomOption.icon, // 使用随机选择的图标
-          tempHigh: tempHigh,     // 使用随机生成的高温
-          tempLow: tempLow,      // 使用随机生成的低温
-          description: randomOption.description, // 使用随机选择的描述
-        });
-      }
-      return randomData;
-    };
-
-    // 生成随机天气数据并设置到 state 中
-    const randomWeatherData = generateRandomWeatherData();
-    setWeatherForecast(randomWeatherData);
-
-  }, []); // 依赖项为空数组，表示只在组件挂载时运行一次
+  // 模拟获取天气数据
+  useEffect(() => {
+    const mockWeatherData: WeatherData[] = [
+      { day: '周一', icon: <FiSun className="w-8 h-8 text-yellow-400" />, tempHigh: 28, tempLow: 22, description: '晴朗' },
+      { day: '周二', icon: <FiCloud className="w-8 h-8 text-gray-400" />, tempHigh: 26, tempLow: 21, description: '多云' },
+      { day: '周三', icon: <FiCloudRain className="w-8 h-8 text-blue-400" />, tempHigh: 24, tempLow: 20, description: '小雨' },
+      { day: '周四', icon: <FiCloudDrizzle className="w-8 h-8 text-blue-300" />, tempHigh: 25, tempLow: 19, description: '阵雨' },
+      { day: '周五', icon: <FiSun className="w-8 h-8 text-yellow-400" />, tempHigh: 29, tempLow: 23, description: '晴转多云' },
+      { day: '周六', icon: <FiWind className="w-8 h-8 text-gray-500" />, tempHigh: 27, tempLow: 22, description: '有风' },
+      { day: '周日', icon: <FiCloud className="w-8 h-8 text-gray-400" />, tempHigh: 26, tempLow: 20, description: '阴' },
+    ];
+    setWeatherForecast(mockWeatherData);
+  }, []);
 
   const handleAnalysisCardClick = (analysisType: AnalysisType) => {
     setSelectedAnalysis(analysisType);
@@ -146,15 +104,15 @@ export default function Intelligence() {
       legend: {
         position: 'top' as const,
         labels: {
-          color: '#4A5568', // text-gray-700
+          color: '#4A5568',
           font: {
-            size: 12, // Adjusted font size for more labels
+            size: 12,
           }
         }
       },
       title: {
         display: true,
-        color: '#2D3748', // text-gray-800
+        color: '#2D3748',
         font: {
           size: 18,
           weight: 'bold',
@@ -163,146 +121,149 @@ export default function Intelligence() {
     },
     scales: {
       x: {
-        ticks: { color: '#4A5568' }, // text-gray-700
-        grid: { color: '#E2E8F0' } // border-gray-200
+        ticks: { color: '#4A5568' },
+        grid: { color: '#E2E8F0' }
       },
       y: {
-        ticks: { color: '#4A5568' }, // text-gray-700
-        grid: { color: '#E2E8F0' } // border-gray-200
+        ticks: { color: '#4A5568' },
+        grid: { color: '#E2E8F0' }
       }
     }
   };
 
-// 模拟图表数据和建议
-  const analysisChartData: Record<AnalysisType, AnalysisChartInfo> = {
-    growth: {
-      type: 'line',
-      title: '生长预测趋势',
-      data: {
-        labels: ['第1周', '第2周', '第3周', '第4周', '第5周', '第6周'],
-        datasets: [
-          {
-            label: '预计重量 (kg)',
-            data: [0.5, 0.8, 1.2, 1.7, 2.3, 3.0],
-            borderColor: 'rgb(59, 130, 246)', // blue-500
-            backgroundColor: 'rgba(59, 130, 246, 0.5)',
-            tension: 0.1,
-          },
-        ],
-      },
-      adviceText: '根据当前生长曲线，预计未来几周生长态势良好。建议保持现有饲料配方和投喂量，并密切关注水质变化，确保溶氧充足。可考虑在第4周后适当增加高蛋白饲料比例，以促进快速增重。',
-    },
-    disease: {
-      type: 'bar',
-      title: '主要疾病风险评估',
-      data: {
-        labels: ['白点病', '烂鳃病', '肠炎', '弧菌病'],
-        datasets: [
-          {
-            label: '风险概率 (%)',
-            // 将概率值改为随机生成 (0-50 之间的整数)
-            data: [
-              Math.floor(Math.random() * 51), 
-              Math.floor(Math.random() * 51),
-              Math.floor(Math.random() * 51),
-              Math.floor(Math.random() * 51)
-            ],
-            backgroundColor: [
-              'rgba(239, 68, 68, 0.6)', // red-500
-              'rgba(245, 158, 11, 0.6)', // amber-500
-              'rgba(234, 179, 8, 0.6)', // yellow-500
-              'rgba(139, 92, 246, 0.6)', // violet-500
-            ],
-            borderColor: [
-                'rgb(239, 68, 68)',
-                'rgb(245, 158, 11)',
-                'rgb(234, 179, 8)',
-                'rgb(139, 92, 246)',
-            ],
-            borderWidth: 1,
-          },
-        ],
-      },
-      adviceText: '当前主要疾病风险评估如下（随机生成概率，仅供参考）：\n\n' +
-        '白点病风险：基于当前环境数据，风险概率较低。\n' +
-        '烂鳃病风险：水质指标波动可能导致风险略有升高，需警惕。\n' +
-        '肠炎风险：饲料新鲜度和投喂量控制良好，风险较低。\n' +
-        '弧菌病风险：水温升高可能导致风险增加，建议加强预防。\n\n' +
-        '综合建议：密切关注鱼群摄食及活动状态，定期进行水质检测。在水温较高或水质有波动时，考虑适量使用益生菌或进行预防性消毒。',
-    },
-    feeding: {
-      type: 'bar',
-      title: '投喂策略效果对比',
-      data: {
-        labels: ['策略A (当前)', '策略B (优化)', '策略C (实验)'],
-        datasets: [
-          {
-            label: '饲料转化率 (FCR)',
-            data: [1.5, 1.3, 1.4],
-            backgroundColor: 'rgba(16, 185, 129, 0.6)', // green-500
-            borderColor: 'rgb(16, 185, 129)',
-            borderWidth: 1,
-          },
-        ],
-      },
-      // 具体展示策略ABC的内容
-      adviceText: '数据显示不同投喂策略对饲料转化率（FCR）的影响：\n\n' +
-        '策略A (当前)：每日投喂 2 次（上午 8:00，下午 4:00），每次按经验投喂至七八分饱。此策略操作简便，但FCR相对较高。\n\n' +
-        '策略B (优化)：每日投喂 3 次（上午 7:30，中午 12:00，下午 5:30），每次投喂量根据鱼体规格、水温及天气情况动态调整。例如，水温适宜且天气晴好时，可适当增加投喂量；水温过高或过低、阴雨天时减少投喂量。此策略能更好地匹配鱼的生理需求，显著降低FCR（1.3）。\n\n' +
-        '策略C (实验)：每日少量多次投喂 4 次（上午 7:00, 11:00, 下午 3:00, 下午 6:00），并结合自动投喂设备精准控制每次投喂时长和量，使用特定配方饲料。此策略在理论上能进一步提升消化吸收效率，但FCR提升不明显（1.4），且操作复杂。\n\n' +
-        '建议：基于现有数据，“策略B (优化)”在降低FCR和易操作性之间取得了最佳平衡。建议全面推广策略B。持续监测FCR数据，并根据实际情况进行微调。',
-    },
-    environment: {
-      type: 'line',
-      title: '国控水站水质评价指标',
-      data: {
-        labels: ['1天前', '12小时前', '6小时前', '当前', '预计6小时后', '预计12小时后'],
-        datasets: [
-          {
-            label: 'pH值',
-            data: [7.8, 7.9, 7.7, 8.0, 7.9, 7.8],
-            borderColor: 'rgb(59, 130, 246)',
-            backgroundColor: 'rgba(59, 130, 246, 0.5)',
-            tension: 0.1,
-            yAxisID: 'y',
-          },
-          {
-            label: '溶解氧 (mg/L)',
-            data: [7.2, 7.5, 7.3, 7.6, 7.4, 7.1],
-            borderColor: 'rgb(34, 197, 94)',
-            backgroundColor: 'rgba(34, 197, 94, 0.5)',
-            tension: 0.1,
-            yAxisID: 'y',
-          },
-          {
-            label: '高锰酸盐指数 (mg/L)',
-            data: [2.5, 2.7, 2.6, 2.8, 2.5, 2.4],
-            borderColor: 'rgb(139, 92, 246)',
-            backgroundColor: 'rgba(139, 92, 246, 0.5)',
-            tension: 0.1,
-            yAxisID: 'y',
-          },
-          {
-            label: '氨氮 (mg/L)',
-            data: [0.1, 0.15, 0.12, 0.18, 0.16, 0.13],
-            borderColor: 'rgb(245, 158, 11)',
-            backgroundColor: 'rgba(245, 158, 11, 0.5)',
-            tension: 0.1,
-            yAxisID: 'y1',
-          },
-          {
-            label: '总磷 (mg/L)',
-            data: [0.02, 0.03, 0.025, 0.035, 0.03, 0.028],
-            borderColor: 'rgb(239, 68, 68)',
-            backgroundColor: 'rgba(239, 68, 68, 0.5)',
-            tension: 0.1,
-            yAxisID: 'y1',
-          },
-        ],
-      },
-      adviceText: '当前各项水质指标总体在可控范围内，但需注意氨氮和总磷有轻微上升趋势。建议检查排污系统，适度增加换水量，并考虑使用底质改良剂。未来12小时溶解氧有下降趋势，请确保增氧设备正常运行，必要时增加开启时长。',
-    },
-  };
+  // 模拟图表数据和建议
+  const [analysisChartData, setAnalysisChartData] = useState<Record<AnalysisType, AnalysisChartInfo>>({
+    growth: {
+      type: 'line',
+      title: '生长预测趋势',
+      data: {
+        labels: ['第1周', '第2周', '第3周', '第4周', '第5周', '第6周'],
+        datasets: [
+          {
+            label: '预计重量 (kg)',
+            data: [0.5, 0.8, 1.2, 1.7, 2.3, 3.0],
+            borderColor: 'rgb(59, 130, 246)',
+            backgroundColor: 'rgba(59, 130, 246, 0.5)',
+            tension: 0.1,
+          },
+        ],
+      },
+      adviceText: '根据当前生长曲线，预计未来几周生长态势良好。建议保持现有饲料配方和投喂量，并密切关注水质变化，确保溶氧充足。可考虑在第4周后适当增加高蛋白饲料比例，以促进快速增重。',
+    },
+    disease: {
+      type: 'bar',
+      title: '主要疾病风险评估',
+      data: {
+        labels: ['白点病', '烂鳃病', '肠炎', '弧菌病'],
+        datasets: [
+          {
+            label: '风险概率 (%)',
+            data: [15, 25, 10, 30],
+            backgroundColor: [
+              'rgba(239, 68, 68, 0.6)',
+              'rgba(245, 158, 11, 0.6)',
+              'rgba(234, 179, 8, 0.6)',
+              'rgba(139, 92, 246, 0.6)',
+            ],
+            borderColor: [
+                'rgb(239, 68, 68)',
+                'rgb(245, 158, 11)',
+                'rgb(234, 179, 8)',
+                'rgb(139, 92, 246)',
+            ],
+            borderWidth: 1,
+          },
+        ],
+      },
+      adviceText: '当前弧菌病和烂鳃病风险较高。建议加强水体消毒，每周使用1-2次益生菌调节水质。密切观察鱼群活动和摄食情况，如有异常立即隔离并考虑使用针对性药物预防。注意控制养殖密度，避免水质恶化。',
+    },
+    feeding: {
+      type: 'bar',
+      title: '投喂策略效果对比',
+      data: {
+        labels: ['策略A (当前)', '策略B (优化)', '策略C (实验)'],
+        datasets: [
+          {
+            label: '饲料转化率 (FCR)',
+            data: [1.5, 1.3, 1.4],
+            backgroundColor: 'rgba(16, 185, 129, 0.6)',
+            borderColor: 'rgb(16, 185, 129)',
+            borderWidth: 1,
+          },
+        ],
+      },
+      adviceText: '数据显示"策略B (优化)"的饲料转化率最佳。建议全面推广策略B，该策略可能涉及调整投喂时间和每日投喂次数。持续监测FCR数据，并根据鱼体规格和水温变化进行微调。可小范围尝试"策略C"以探索进一步优化的可能性。',
+    },
+    environment: {
+      type: 'line',
+      title: '国控水站水质评价指标',
+      data: {
+        labels: ['1天前', '12小时前', '6小时前', '当前', '预计6小时后', '预计12小时后'],
+        datasets: [
+          {
+            label: 'pH值',
+            data: [7.8, 7.9, 7.7, 8.0, 7.9, 7.8],
+            borderColor: 'rgb(59, 130, 246)',
+            backgroundColor: 'rgba(59, 130, 246, 0.5)',
+            tension: 0.1,
+            yAxisID: 'y',
+          },
+          {
+            label: '溶解氧 (mg/L)',
+            data: [7.2, 7.5, 7.3, 7.6, 7.4, 7.1],
+            borderColor: 'rgb(34, 197, 94)',
+            backgroundColor: 'rgba(34, 197, 94, 0.5)',
+            tension: 0.1,
+            yAxisID: 'y',
+          },
+          {
+            label: '高锰酸盐指数 (mg/L)',
+            data: [2.5, 2.7, 2.6, 2.8, 2.5, 2.4],
+            borderColor: 'rgb(139, 92, 246)',
+            backgroundColor: 'rgba(139, 92, 246, 0.5)',
+            tension: 0.1,
+            yAxisID: 'y',
+          },
+          {
+            label: '氨氮 (mg/L)',
+            data: [0.1, 0.15, 0.12, 0.18, 0.16, 0.13],
+            borderColor: 'rgb(245, 158, 11)',
+            backgroundColor: 'rgba(245, 158, 11, 0.5)',
+            tension: 0.1,
+            yAxisID: 'y1',
+          },
+          {
+            label: '总磷 (mg/L)',
+            data: [0.02, 0.03, 0.025, 0.035, 0.03, 0.028],
+            borderColor: 'rgb(239, 68, 68)',
+            backgroundColor: 'rgba(239, 68, 68, 0.5)',
+            tension: 0.1,
+            yAxisID: 'y1',
+          },
+        ],
+      },
+      adviceText: '当前各项水质指标总体在可控范围内，但需注意氨氮和总磷有轻微上升趋势。建议检查排污系统，适度增加换水量，并考虑使用底质改良剂。未来12小时溶解氧有下降趋势，请确保增氧设备正常运行，必要时增加开启时长。',
+    },
+    recognition: {
+      type: 'bar',
+      title: '鱼类图片识别',
+      data: {
+        labels: ['识别中...'],
+        datasets: [
+          {
+            label: '置信度',
+            data: [0],
+            backgroundColor: 'rgba(59, 130, 246, 0.6)',
+            borderColor: 'rgb(59, 130, 246)',
+            borderWidth: 1,
+          },
+        ],
+      },
+      adviceText: '请上传鱼类图片进行识别，系统将分析鱼的种类并提供相关信息。',
+      recognitionResult: null,
+      imagePreview: null
+    }
+  });
 
   // 更新环境评估图表的Y轴配置
   const environmentChartOptions: ChartOptions<'line'> = {
@@ -319,7 +280,7 @@ export default function Intelligence() {
                 color: '#4A5568',
             },
             ticks: { color: '#4A5568' },
-            grid: { drawOnChartArea: true, color: '#E2E8F0' }, // Ensure grid is drawn for primary axis
+            grid: { drawOnChartArea: true, color: '#E2E8F0' },
         },
         y1: {
             type: 'linear',
@@ -336,9 +297,93 @@ export default function Intelligence() {
     }
   };
 
-
   const currentChartInfo = selectedAnalysis ? analysisChartData[selectedAnalysis] : null;
 
+// 处理图片上传
+const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const file = event.target.files?.[0];
+  if (!file) return;
+
+  // 验证图片类型
+  if (!file.type.match('image.*')) {
+    setRecognitionError('请上传有效的图片文件');
+    setRecognitionStatus('error');
+    return;
+  }
+
+  // 验证图片大小 (限制为5MB)
+  if (file.size > 5 * 1024 * 1024) {
+    setRecognitionError('图片大小不能超过5MB');
+    setRecognitionStatus('error');
+    return;
+  }
+
+  setRecognitionStatus('uploading');
+  setRecognitionError(null);
+
+  // 创建预览URL
+  const previewUrl = URL.createObjectURL(file);
+  
+  // 更新预览和状态
+  setAnalysisChartData(prev => ({
+    ...prev,
+    recognition: {
+      ...prev.recognition,
+      imagePreview: previewUrl,
+      recognitionResult: null,
+      adviceText: '正在识别鱼类...'
+    }
+  }));
+
+  try {
+    const formData = new FormData();
+    formData.append('image', file);
+
+    // 直接调用 Go 后端 API
+    const response = await fetch('http://localhost:8080/api/fish-recognition', {
+      method: 'POST',
+      body: formData
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || '识别失败');
+    }
+
+    const result = await response.json();
+    
+    setRecognitionStatus('success');
+    setAnalysisChartData(prev => ({
+      ...prev,
+      recognition: {
+        ...prev.recognition,
+        recognitionResult: {
+          name: result.name,
+          score: result.score,
+          description: result.description
+        },
+        adviceText: `识别成功: ${result.name} (置信度: ${(result.score * 100).toFixed(1)}%)`
+      }
+    }));
+  } catch (error: any) {
+    setRecognitionStatus('error');
+    setRecognitionError(error.message || '识别失败，请重试');
+    setAnalysisChartData(prev => ({
+      ...prev,
+      recognition: {
+        ...prev.recognition,
+        adviceText: '识别失败: ' + (error.message || '请重试')
+      }
+    }));
+  }
+};
+
+  // 触发文件选择
+  const triggerFileInput = () => {
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
+    }
+  };
 
   return (
     <ProtectedRoute>
@@ -361,7 +406,7 @@ export default function Intelligence() {
               title="疾病预警"
               icon={<FaBrain className="w-6 h-6 text-red-500" />}
               description="识别潜在健康风险"
-              status="已完成"
+              status="进行中"
               confidence={87}
               onClick={() => handleAnalysisCardClick('disease')}
               isSelected={selectedAnalysis === 'disease'}
@@ -383,6 +428,16 @@ export default function Intelligence() {
               confidence={90}
               onClick={() => handleAnalysisCardClick('environment')}
               isSelected={selectedAnalysis === 'environment'}
+            />
+            {/* 新增鱼类识别卡片 */}
+            <AnalysisCard
+              title="鱼类识别"
+              icon={<FaFish className="w-6 h-6 text-teal-500" />}
+              description="上传图片识别鱼类品种"
+              status="待识别"
+              confidence={0}
+              onClick={() => handleAnalysisCardClick('recognition')}
+              isSelected={selectedAnalysis === 'recognition'}
             />
           </div>
 
@@ -416,26 +471,136 @@ export default function Intelligence() {
                   <FaTimes className="w-5 h-5 text-gray-600" />
                 </button>
               </div>
-              <div className="h-[400px] md:h-[500px] mb-6"> {/* Added margin-bottom to chart container */}
-                {currentChartInfo.type === 'line' ? (
-                  <Line 
-                    data={currentChartInfo.data as ChartData<'line'>} 
-                    options={selectedAnalysis === 'environment' ? 
-                             (environmentChartOptions as ChartOptions<'line'>) :
-                             (commonChartOptions as ChartOptions<'line'>)} 
-                  />
-                ) : (
-                  <Bar 
-                    data={currentChartInfo.data as ChartData<'bar'>} 
-                    options={commonChartOptions as ChartOptions<'bar'>}
-                  />
-                )}
-              </div>
+              
+              {/* 鱼类识别区域 */}
+              {selectedAnalysis === 'recognition' && (
+                <div className="mb-6">
+                  <div className="flex flex-col md:flex-row gap-6">
+                    {/* 图片上传和预览区域 */}
+                    <div className="w-full md:w-1/2">
+                      <div 
+                        className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-all
+                          ${recognitionStatus === 'idle' 
+                            ? 'border-gray-300 hover:border-blue-400 bg-gray-50' 
+                            : recognitionStatus === 'uploading' 
+                              ? 'border-yellow-400 bg-yellow-50' 
+                              : recognitionStatus === 'success' 
+                                ? 'border-green-400 bg-green-50' 
+                                : 'border-red-400 bg-red-50'}`}
+                        onClick={triggerFileInput}
+                      >
+                        <input
+                          type="file"
+                          ref={fileInputRef}
+                          onChange={handleImageUpload}
+                          accept="image/*"
+                          className="hidden"
+                        />
+                        
+                        {currentChartInfo.imagePreview ? (
+                          <>
+                            <img 
+                              src={currentChartInfo.imagePreview} 
+                              alt="鱼类图片预览" 
+                              className="max-h-64 mx-auto mb-4 rounded-lg object-contain"
+                            />
+                            <p className="text-gray-600">
+                              {recognitionStatus === 'uploading' 
+                                ? '正在识别中...' 
+                                : recognitionStatus === 'success' 
+                                  ? '点击更换图片' 
+                                  : '点击重新上传'}
+                            </p>
+                          </>
+                        ) : (
+                          <>
+                            <FaUpload className="w-12 h-12 mx-auto text-gray-400 mb-4" />
+                            <p className="text-gray-600 mb-2">点击或拖拽图片到此处上传</p>
+                            <p className="text-sm text-gray-500">支持 JPG, PNG 格式，最大 5MB</p>
+                          </>
+                        )}
+                      </div>
+                      
+                      {recognitionError && (
+                        <div className="mt-3 text-red-500 text-sm text-center">{recognitionError}</div>
+                      )}
+                    </div>
+                    
+                    {/* 识别结果展示区域 */}
+                    <div className="w-full md:w-1/2">
+                      {currentChartInfo.recognitionResult ? (
+                        <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
+                          <div className="flex items-center mb-4">
+                            <FaCheck className="w-6 h-6 text-green-500 mr-2" />
+                            <h3 className="text-xl font-semibold text-gray-800">识别结果</h3>
+                          </div>
+                          
+                          <div className="space-y-4">
+                            <div>
+                              <h4 className="text-sm font-medium text-gray-500">鱼类名称</h4>
+                              <p className="text-lg font-semibold text-gray-800">{currentChartInfo.recognitionResult.name}</p>
+                            </div>
+                            
+                            <div>
+                              <h4 className="text-sm font-medium text-gray-500">置信度</h4>
+                              <div className="w-full bg-gray-200 rounded-full h-2.5">
+                                <div 
+                                  className="bg-blue-600 h-2.5 rounded-full" 
+                                  style={{ width: `${currentChartInfo.recognitionResult.score * 100}%` }}
+                                ></div>
+                              </div>
+                              <p className="text-sm text-gray-600 mt-1">
+                                {Math.round(currentChartInfo.recognitionResult.score * 100)}%
+                              </p>
+                            </div>
+                            
+                            <div>
+                              <h4 className="text-sm font-medium text-gray-500">鱼类描述</h4>
+                              <p className="text-gray-700">{currentChartInfo.recognitionResult.description}</p>
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="bg-gray-50 border border-gray-200 rounded-lg p-6 text-center h-full flex items-center justify-center">
+                          <div>
+                            <FaFish className="w-12 h-12 mx-auto text-gray-400 mb-4" />
+                            <p className="text-gray-600">
+                              {recognitionStatus === 'uploading' 
+                                ? '正在识别鱼类品种...' 
+                                : '上传图片后，系统将自动识别鱼类品种'}
+                            </p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              {/* 图表展示区域（非识别页面） */}
+              {selectedAnalysis !== 'recognition' && (
+                <div className="h-[400px] md:h-[500px] mb-6">
+                  {currentChartInfo.type === 'line' ? (
+                    <Line 
+                      data={currentChartInfo.data as ChartData<'line'>} 
+                      options={selectedAnalysis === 'environment' ? 
+                               (environmentChartOptions as ChartOptions<'line'>) :
+                               (commonChartOptions as ChartOptions<'line'>)} 
+                    />
+                  ) : (
+                    <Bar 
+                      data={currentChartInfo.data as ChartData<'bar'>} 
+                      options={commonChartOptions as ChartOptions<'bar'>}
+                    />
+                  )}
+                </div>
+              )}
+              
               {/* 文字建议区 */}
               <div className="mt-6 p-4 bg-blue-50 border-l-4 border-blue-500 rounded-r-lg">
                 <h3 className="text-lg font-semibold text-blue-700 mb-2 flex items-center">
                   <FaLightbulb className="w-5 h-5 mr-2 text-blue-600" />
-                  图表解读与建议
+                  {selectedAnalysis === 'recognition' ? '识别说明' : '图表解读与建议'}
                 </h3>
                 <p className="text-sm text-gray-700 leading-relaxed">
                   {currentChartInfo.adviceText}
@@ -494,7 +659,6 @@ export default function Intelligence() {
               />
             </div>
           </div>
-          <WaterQualityScore />
         </div>
       </main>
     </ProtectedRoute>
@@ -546,26 +710,8 @@ function AnalysisCard({
       </div>
       <p className="text-sm text-gray-600 mb-4 h-12 overflow-hidden">{description}</p>
       <div className="flex justify-between items-center">
-        <span className={`text-xs px-2 py-1 rounded-full ${status === '已完成' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>{status}</span>
-        <span className="text-sm font-medium text-blue-600">{confidence}% 置信度</span>
-      </div>
-    </div>
-  );
-}
-
-function WaterQualityScore() {
-  return (
-    <div className="bg-white p-6 rounded-xl shadow-lg mb-10 flex flex-col items-center">
-      <h2 className="text-2xl font-semibold text-gray-700 mb-6">水质质量评分</h2>
-      <div className="w-full flex justify-center">
-        <Image
-          src="/img/evaluation_index.png"
-          alt="水质质量评分"
-          width={480}
-          height={320}
-          className="rounded-lg shadow"
-          style={{ maxWidth: '100%', height: 'auto' }}
-        />
+        <span className={`text-xs px-2 py-1 rounded-full ${status === '已完成' ? 'bg-green-100 text-green-700' : status === '待识别' ? 'bg-blue-100 text-blue-700' : 'bg-yellow-100 text-yellow-700'}`}>{status}</span>
+        <span className="text-sm font-medium text-blue-600">{confidence ? `${confidence}% 置信度` : '等待上传'}</span>
       </div>
     </div>
   );

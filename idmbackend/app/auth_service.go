@@ -1,9 +1,10 @@
 package app
 
 import (
+	"time"
+
 	"github.com/MoyInGxing/idm/config"
 	"github.com/MoyInGxing/idm/domain"
-	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 )
@@ -35,7 +36,7 @@ func (s *AuthService) Login(username, password string) (string, *domain.User, er
 	}
 
 	// Generate JWT token
-	token, err := s.generateToken(user.ID, user.Role)
+	token, err := s.GenerateToken(user.ID, user.Role)
 	if err != nil {
 		return "", nil, err
 	}
@@ -89,7 +90,8 @@ func (s *AuthService) GetUserRoleFromToken(token *jwt.Token) (domain.Role, error
 	return "", domain.ErrInvalidToken
 }
 
-func (s *AuthService) generateToken(userID uint, role domain.Role) (string, error) {
+// GenerateToken 生成JWT token
+func (s *AuthService) GenerateToken(userID uint, role domain.Role) (string, error) {
 	claims := jwt.MapClaims{
 		"user_id": userID,
 		"role":    role,

@@ -34,3 +34,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# 编译出的静态项目文件
+/dist/*
+!/dist/required-file.js
+
