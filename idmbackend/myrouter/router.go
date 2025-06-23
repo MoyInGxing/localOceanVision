@@ -15,7 +15,7 @@ func SetupRouter(userHandler *handler.UserHandler, speciesHandler *handler.Speci
 	{
 		api.POST("/register", userHandler.Register)
 		api.POST("/login", userHandler.Login)
-
+		api.POST("/chat", handler.Chat)
 		// Protected routes
 		protected := api.Group("/users").Use(authMiddleware.Handle())
 		{

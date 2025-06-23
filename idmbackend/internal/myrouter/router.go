@@ -37,7 +37,7 @@ func SetupRouter(
 	{
 		// 注册路由
 		api.POST("/register", userHandler.Register)
-
+		api.POST("/chat", handler.Chat)
 		// 登录路由
 		api.POST("/login", userHandler.Login)
 
