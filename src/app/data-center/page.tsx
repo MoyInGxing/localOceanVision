@@ -1536,13 +1536,32 @@ export default function DataCenter() {
     return parts.slice(0, 2).join('-');
   })));
 
+  // --- 新增：报警弹窗自动消失 ---
+  useEffect(() => {
+    if (showAlert) {
+      const timer = setTimeout(() => {
+        setShowAlert(false);
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [showAlert]);
+
   return (
     <ProtectedRoute>
       <main className="p-8">
-        {/* --- 报警弹窗的JSX渲染 (按钮颜色已更新) --- */}
+        {/* --- 报警弹窗的JSX渲染 (右上角堆叠+自动消失+手动关闭) --- */}
         {showAlert && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className={`bg-white rounded-lg shadow-2xl p-6 max-w-sm w-full mx-4 transform transition-all duration-300 ease-out ${showAlert ? 'scale-100 opacity-100' : 'scale-95 opacity-0'}`}>
+          <div className="fixed top-30 right-1 z-50 flex flex-col items-end space-y-4">
+            <div className={`relative bg-white rounded-lg shadow-2xl p-6 max-w-sm w-full mx-4 transform transition-all duration-300 ease-out ${showAlert ? 'scale-100 opacity-100' : 'scale-95 opacity-0'}`}>  
+              {/* 关闭按钮 */}
+              <button
+                type="button"
+                className="absolute top-2 right-2 text-gray-400 hover:text-gray-700 text-xl font-bold focus:outline-none"
+                aria-label="关闭"
+                onClick={() => setShowAlert(false)}
+              >
+                ×
+              </button>
               <div className="flex items-start">
                 <div className={`flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full ${alertStatus === 'error' ? 'bg-red-100' : 'bg-yellow-100'} sm:mx-0 sm:h-10 sm:w-10`}>
                   <FaExclamationTriangle className={`${alertStatus === 'error' ? 'text-red-600' : 'text-yellow-600'} h-6 w-6`} />
@@ -1561,7 +1580,8 @@ export default function DataCenter() {
                   </div>
                 </div>
               </div>
-              <div className="mt-5 sm:mt-4 sm:flex sm:flex-row-reverse">
+              {/* 保留底部按钮可选 */}
+              {/* <div className="mt-5 sm:mt-4 sm:flex sm:flex-row-reverse">
                 <button
                   type="button"
                   className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:ml-3 sm:w-auto sm:text-sm"
@@ -1569,7 +1589,7 @@ export default function DataCenter() {
                 >
                   我知道了
                 </button>
-              </div>
+              </div> */}
             </div>
           </div>
         )}

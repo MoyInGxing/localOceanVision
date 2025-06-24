@@ -1,7 +1,4 @@
 {
-  "/page": "app/page.js",
-  "/api/auth/validate/route": "app/api/auth/validate/route.js",
-  "/dashboard/page": "app/dashboard/page.js",
-  "/login/page": "app/login/page.js",
-  "/intelligence/page": "app/intelligence/page.js"
+  "/data-center/page": "app/data-center/page.js",
+  "/login/page": "app/login/page.js"
 }
