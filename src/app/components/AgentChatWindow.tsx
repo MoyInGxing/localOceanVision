@@ -134,13 +134,13 @@ export default function AgentChatWindow() {
   return (
     <div className="bg-white p-6 rounded-xl shadow-lg">
       <h2 className="text-2xl font-semibold text-gray-700 mb-4">AI 智能助手</h2>
-      <div className="h-80 bg-gray-50 rounded-lg p-4 overflow-y-auto flex flex-col space-y-4">
+      <div className="h-200 bg-gray-50 rounded-lg p-4 overflow-y-auto flex flex-col space-y-4">
         {messages.map((msg, index) => (
           <div key={index} className={`flex items-start gap-3 ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
             {msg.sender === 'ai' && (
-                <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white font-bold flex-shrink-0">A</div>
+                <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-gray-800 font-bold flex-shrink-0">A</div>
             )}
-            <div className={`max-w-xs md:max-w-md p-3 rounded-lg ${msg.sender === 'user' ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-800'}`}>
+            <div className={`max-w-xs md:max-w-md p-3 rounded-lg ${msg.sender === 'user' ? 'bg-blue-500 text-gray-800' : 'bg-gray-200 text-gray-800'}`}>
               <p className="text-sm">{msg.text}</p>
             </div>
              {msg.sender === 'user' && (
@@ -150,7 +150,7 @@ export default function AgentChatWindow() {
         ))}
         {isLoading && (
             <div className="flex items-start gap-3 justify-start">
-                <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-white font-bold flex-shrink-0">A</div>
+                <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center text-gray-800 font-bold flex-shrink-0">A</div>
                 <div className="max-w-xs md:max-w-md p-3 rounded-lg bg-gray-200 text-gray-800">
                     <FaSpinner className="animate-spin text-gray-500" />
                 </div>
