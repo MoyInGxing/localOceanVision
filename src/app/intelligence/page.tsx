@@ -5,6 +5,7 @@ import ProtectedRoute from '../components/ProtectedRoute';
 import { FaBrain, FaChartLine, FaRobot, FaClipboardCheck, FaTimes, FaLightbulb, FaFish, FaUpload, FaCheck } from 'react-icons/fa';
 import { FiSun, FiCloud, FiCloudRain, FiCloudDrizzle, FiWind, FiThermometer } from 'react-icons/fi';
 import { Line, Bar } from 'react-chartjs-2';
+import AgentChatWindow from '../components/AgentChatWindow'; 
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -608,7 +609,10 @@ const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => 
               </div>
             </div>
           )}
-
+          {/* AI 对话 */}
+          <div className="mb-10">
+          <AgentChatWindow />
+          </div>
 
           {/* AI 建议面板 */}
           <div className="bg-white p-6 rounded-xl shadow-lg mb-10">
