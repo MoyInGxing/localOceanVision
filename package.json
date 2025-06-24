@@ -9,6 +9,9 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@chakra-ui/react": "^3.21.0",
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.0",
     "@tensorflow-models/coco-ssd": "^2.2.3",
     "@tensorflow/tfjs": "^4.22.0",
     "@types/d3": "^7.4.3",
@@ -17,6 +20,7 @@
     "bcryptjs": "^2.4.3",
     "chart.js": "^4.4.9",
     "d3": "^7.9.0",
+    "framer-motion": "^12.18.1",
     "jsonwebtoken": "^9.0.2",
     "leaflet": "^1.9.4",
     "next": "14.0.3",

@@ -12,6 +12,7 @@ import (
 func SetupRouter(
 	userHandler *handler.UserHandler,
 	speciesHandler *handler.SpeciesHandler,
+	fishRecognitionHandler gin.HandlerFunc, // 新增鱼类识别处理函数
 	authMiddleware *middleware.AuthMiddleware,
 	adminAuthMiddleware *middleware.AdminAuthMiddleware,
 ) *gin.Engine {
@@ -40,6 +41,9 @@ func SetupRouter(
 		api.POST("/chat", handler.Chat)
 		// 登录路由
 		api.POST("/login", userHandler.Login)
+
+		// 添加鱼类识别路由 - 不需要认证
+		api.POST("/fish-recognition", fishRecognitionHandler) // 使用传入的 handler
 
 		// 物种路由
 		species := api.Group("/species")

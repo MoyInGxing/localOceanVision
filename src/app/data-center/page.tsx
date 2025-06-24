@@ -1703,7 +1703,6 @@ export default function DataCenter() {
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{species.length1}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{species.optimal_temp_range}</td>
                     </tr>
-
                   ))}
                 </tbody>
               </table>
