@@ -64,6 +64,8 @@ func SetupRouter(
 			waterQuality.GET("/area/:area_id", waterQualityHandler.GetWaterQualityByAreaID)
 			// 获取指定区域的最新水质数据
 			waterQuality.GET("/area/:area_id/latest", waterQualityHandler.GetLatestWaterQualityByAreaID)
+			// 根据区域ID获取温度和pH值数据
+			waterQuality.GET("/area/:area_id/temp-ph", waterQualityHandler.GetTemperatureAndPHByAreaID)
 			// 创建水质记录
 			waterQuality.POST("", waterQualityHandler.CreateWaterQuality)
 			// 更新水质记录

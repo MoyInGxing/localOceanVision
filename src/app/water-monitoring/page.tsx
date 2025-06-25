@@ -142,13 +142,28 @@ export default function WaterMonitoring() {
 
   // 获取水质状态
   const getStatus = (temperature: number, ph: number, oxygen: number, turbidity: number): WaterQualityStatus => {
-    if (temperature < 10 || temperature > 32 || ph < 5.5 || ph > 9.5 || oxygen < 2 || turbidity > 95) {
-      return 'error';
+    // 设置更合理的阈值
+    if (isNaN(temperature) || isNaN(ph) || isNaN(oxygen) || isNaN(turbidity)) {
+      return "warning";
     }
-    if (temperature < 15 || temperature > 28 || ph < 6.5 || ph > 8.5 || oxygen < 4 || turbidity > 50) {
-      return 'warning';
+    
+    // 异常状态阈值 - 更严格的条件
+    if (temperature > 32 || temperature < 10 || 
+        ph > 9.5 || ph < 5.5 || 
+        oxygen < 2 || 
+        turbidity > 95) {
+      return "error";
     }
-    return 'normal';
+    
+    // 警告状态阈值 - 更严格的条件
+    if (temperature > 30 || temperature < 12 || 
+        ph > 9.0 || ph < 6.0 || 
+        oxygen < 3 || 
+        turbidity > 85) {
+      return "warning";
+    }
+    
+    return "normal";
   };
 
   // --- 新增：模拟实时水质监测并触发报警 ---
@@ -426,14 +441,18 @@ export default function WaterMonitoring() {
     // 清除现有图表
     d3.select(chinaMapRef.current).selectAll("*").remove();
 
-    // 设置图表尺寸
-    const width = 800;
+    // 获取SVG容器的实际宽度和高度
+    const width = chinaMapRef.current.clientWidth;
     const height = 500;
 
     // 创建SVG
     const svg = d3.select(chinaMapRef.current)
-      .attr("width", width)
+      .attr("width", "100%")
       .attr("height", height);
+      
+    // 设置视口以确保SVG内容完全可见
+    svg.attr("viewBox", `0 0 ${width} ${height}`);
+      
 
     // 添加加载提示
     svg.append("text")
@@ -461,7 +480,7 @@ export default function WaterMonitoring() {
       // 定义投影
       const projection = d3.geoMercator()
         .center([105, 38])
-        .scale(800)
+        .scale(width / 1.5) // 根据容器宽度动态调整比例
         .translate([width / 2, height / 2]);
 
       // 创建路径生成器
@@ -564,7 +583,7 @@ export default function WaterMonitoring() {
       // 添加图例
       const legend = svg.append("g")
         .attr("class", "legend")
-        .attr("transform", `translate(${width - 150}, ${height - 100})`);
+        .attr("transform", `translate(${Math.max(width - 150, 10)}, ${height - 100})`);
 
       // 添加图例标题
       legend.append("text")
@@ -622,6 +641,21 @@ export default function WaterMonitoring() {
     createTemperatureChart(temperatureData);
     createProductionChart(productionData);
     createChinaMap().catch(error => console.error("地图渲染失败:", error));
+    
+    // 添加窗口大小变化监听器
+    const handleResize = () => {
+      // 延迟重新渲染以避免频繁调用
+      setTimeout(() => {
+        createChinaMap().catch(error => console.error("地图重新渲染失败:", error));
+      }, 100);
+    };
+    
+    window.addEventListener('resize', handleResize);
+    
+    // 清理函数
+    return () => {
+      window.removeEventListener('resize', handleResize);
+    };
   }, []);
 
   // 时间范围变化时重新生成图表

@@ -49,6 +49,9 @@ export default function Header() {
                         <Link href="/intelligence" className="text-gray-700 hover:text-blue-600 transition-colors">
                             智能中心
                         </Link>
+                        <Link href="/monitoring-points" className="text-gray-700 hover:text-blue-600 transition-colors">
+                            监测点管理
+                        </Link>
                         <Link href="/data-center" className="text-gray-700 hover:text-blue-600 transition-colors">
                             数据中心
                         </Link>
@@ -127,6 +130,13 @@ export default function Header() {
                                 onClick={() => setIsMobileMenuOpen(false)}
                             >
                                 智能中心
+                            </Link>
+                            <Link
+                                href="/monitoring-points"
+                                className="text-gray-700 hover:text-blue-600 transition-colors"
+                                onClick={() => setIsMobileMenuOpen(false)}
+                            >
+                                监测点管理
                             </Link>
                             <Link
                                 href="/data-center"

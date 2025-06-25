@@ -192,3 +192,49 @@ func (h *WaterQualityHandler) DeleteWaterQuality(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"message": "水质记录删除成功"})
 }
+
+// GetTemperatureAndPHByAreaID 根据区域ID获取温度和pH值数据
+func (h *WaterQualityHandler) GetTemperatureAndPHByAreaID(c *gin.Context) {
+	areaID := c.Param("area_id")
+	if areaID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "区域ID不能为空"})
+		return
+	}
+
+	waterQuality, err := h.waterQualityService.GetWaterQualityByAreaID(areaID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "获取水质数据失败"})
+		return
+	}
+
+	// 提取温度和pH值数据
+	type TemperaturePHData struct {
+		RecordID    string   `json:"record_id"`
+		AreaID      string   `json:"area_id"`
+		RecordTime  *string  `json:"record_time"`
+		Temperature *float64 `json:"temperature"`
+		PHValue     *float64 `json:"ph_value"`
+	}
+
+	var result []TemperaturePHData
+	for _, wq := range waterQuality {
+		var recordTime *string
+		if wq.RecordTime != nil {
+			timeStr := wq.RecordTime.Format("2006-01-02 15:04:05")
+			recordTime = &timeStr
+		}
+		
+		result = append(result, TemperaturePHData{
+			RecordID:    wq.RecordID,
+			AreaID:      wq.AreaID,
+			RecordTime:  recordTime,
+			Temperature: wq.Temperature,
+			PHValue:     wq.PHValue,
+		})
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"data":  result,
+		"total": len(result),
+	})
+}
