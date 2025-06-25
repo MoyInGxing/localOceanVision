@@ -3,6 +3,8 @@
 import { useEffect, useState, useRef } from 'react';
 import * as d3 from 'd3';
 import ProtectedRoute from '../components/ProtectedRoute';
+import { downloadD3Chart, downloadCSV, getTimestamp } from '../../utils/chartDownload';
+import { FaDownload, FaFileExport } from 'react-icons/fa';
 
 interface TemperatureData {
   time: string;
@@ -286,8 +288,42 @@ export default function Dashboard() {
 
           {/* 图表区域 - 使用D3.js */}
           <div className="bg-white p-6 rounded-lg shadow-lg mb-8">
-            <h2 className="text-xl font-semibold mb-4">温度趋势</h2>
-            <div className="h-[400px] w-full">
+            <div className="mb-4">
+              <h2 className="text-xl font-semibold">温度趋势</h2>
+            </div>
+            <div className="h-[400px] w-full relative">
+              {/* 图表下载按钮 - 右上角 */}
+              <div className="absolute top-4 right-4 flex space-x-2 z-10">
+                <button
+                  onClick={() => {
+                    const timestamp = getTimestamp();
+                    downloadD3Chart(
+                      svgRef,
+                      `温度趋势_${timeRange}_${timestamp}`
+                    );
+                  }}
+                  className="flex items-center space-x-1 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-lg text-sm"
+                  title="下载图表"
+                >
+                  <FaDownload className="w-3 h-3" />
+                  <span className="hidden sm:inline">下载</span>
+                </button>
+                <button
+                  onClick={() => {
+                    const timestamp = getTimestamp();
+                    downloadCSV(
+                      temperatureData,
+                      `温度数据_${timeRange}_${timestamp}`,
+                      ['时间', '温度(°C)']
+                    );
+                  }}
+                  className="flex items-center space-x-1 px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors shadow-lg text-sm"
+                  title="导出数据"
+                >
+                  <FaFileExport className="w-3 h-3" />
+                  <span className="hidden sm:inline">导出</span>
+                </button>
+              </div>
               <svg ref={svgRef} width="100%" height="400"></svg>
             </div>
           </div>

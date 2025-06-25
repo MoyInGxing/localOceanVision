@@ -195,7 +195,6 @@ USE idm;
 ```
 6. 载入数据，查看public/data文件夹下的sql初始化文件
 自行查阅sql导入文件方法，导入文件即可使用
-注意user表需要自行创建，schema(id | username | password | role  )
 
 ### 运行相关
 首次运行可能需要安装
