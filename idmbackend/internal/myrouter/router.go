@@ -12,6 +12,7 @@ import (
 func SetupRouter(
 	userHandler *handler.UserHandler,
 	speciesHandler *handler.SpeciesHandler,
+	waterQualityHandler *handler.WaterQualityHandler,
 	fishRecognitionHandler gin.HandlerFunc, // 新增鱼类识别处理函数
 	authMiddleware *middleware.AuthMiddleware,
 	adminAuthMiddleware *middleware.AdminAuthMiddleware,
@@ -45,10 +46,36 @@ func SetupRouter(
 		// 添加鱼类识别路由 - 不需要认证
 		api.POST("/fish-recognition", fishRecognitionHandler) // 使用传入的 handler
 
-		// 物种路由
+		// 物种数据路由
 		species := api.Group("/species")
 		{
 			species.GET("", speciesHandler.GetAllSpecies)
+			species.POST("", speciesHandler.CreateSpecies)
+		}
+
+		// 水质数据路由
+		waterQuality := api.Group("/water-quality")
+		{
+			// 获取所有水质数据
+			waterQuality.GET("", waterQualityHandler.GetAllWaterQuality)
+			// 根据记录ID获取水质数据
+			waterQuality.GET("/record/:record_id", waterQualityHandler.GetWaterQualityByRecordID)
+			// 根据区域ID获取水质数据（支持分页）
+			waterQuality.GET("/area/:area_id", waterQualityHandler.GetWaterQualityByAreaID)
+			// 获取指定区域的最新水质数据
+			waterQuality.GET("/area/:area_id/latest", waterQualityHandler.GetLatestWaterQualityByAreaID)
+			// 创建水质记录
+			waterQuality.POST("", waterQualityHandler.CreateWaterQuality)
+			// 更新水质记录
+			waterQuality.PUT("/record/:record_id", waterQualityHandler.UpdateWaterQuality)
+			// 删除水质记录
+			waterQuality.DELETE("/record/:record_id", waterQualityHandler.DeleteWaterQuality)
+		}
+
+		// 数据库路由
+		database := api.Group("/database")
+		{
+			database.GET("/schema", speciesHandler.ExportDatabaseSchema)
 		}
 
 		// 需要认证的路由

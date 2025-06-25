@@ -81,9 +81,9 @@ export default function DataCenter() {
     {
       title: '水质监测中心',
       description: '实时监测水质状况，查看历史趋势，管理监测站点',
-      icon: <FaWater className="text-4xl" />,
+      icon: <FaWater className="text-4xl text-black" />,
       link: '/water-monitoring',
-      color: 'from-blue-500 to-cyan-500',
+      color: 'bg-gradient-to-r from-blue-500 to-cyan-500',
       features: [
         '实时水质监测',
         '历史数据分析',
@@ -95,9 +95,9 @@ export default function DataCenter() {
     {
       title: '物种数据分析',
       description: '分析海洋物种数据，预测生长趋势，管理物种信息',
-      icon: <FaFish className="text-4xl" />,
+      icon: <FaFish className="text-4xl text-black" />,
       link: '/species-analysis',
-      color: 'from-green-500 to-emerald-500',
+      color: 'bg-gradient-to-r from-green-500 to-emerald-500',
       features: [
         '物种数据管理',
         '体长体重分析',
@@ -155,7 +155,7 @@ export default function DataCenter() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
               {featureModules.map((module, index) => (
                 <div key={index} className="bg-white rounded-xl shadow-lg overflow-hidden hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1">
-                  <div className={`bg-gradient-to-r ${module.color} p-6 text-white`}>
+                  <div className={`${module.color} p-6 text-white`}>
                     <div className="flex items-center justify-between mb-4">
                       <div className="flex items-center space-x-4">
                         {module.icon}
@@ -163,7 +163,7 @@ export default function DataCenter() {
                       </div>
                       <FaArrowRight className="text-xl opacity-70" />
                     </div>
-                    <p className="text-lg opacity-90">{module.description}</p>
+                    <p className="text-lg text-black">{module.description}</p>
                   </div>
                   
                   <div className="p-6">

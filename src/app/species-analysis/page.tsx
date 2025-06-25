@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import * as d3 from 'd3';
-import { FaDownload, FaFilter, FaSearch, FaFileExport, FaUpload, FaChartLine } from 'react-icons/fa';
+import { FaDownload, FaFilter, FaSearch, FaFileExport, FaUpload, FaChartLine, FaCaretDown } from 'react-icons/fa';
 import { downloadD3Chart, downloadCSV, getTimestamp } from '../../utils/chartDownload';
 
 // 定义物种数据类型
@@ -50,12 +50,16 @@ export default function SpeciesAnalysis() {
   
   // --- 新增：数据上传和预测相关状态 ---
   const [uploadedData, setUploadedData] = useState<FishGrowthData[]>([]);
+  const [presetData, setPresetData] = useState<FishGrowthData[]>([]);
   const [predictionResults, setPredictionResults] = useState<GrowthPrediction[]>([]);
   const [uploadLoading, setUploadLoading] = useState(false);
   const [predictionLoading, setPredictionLoading] = useState(false);
   const [selectedUploadSpecies, setSelectedUploadSpecies] = useState<string>('');
   const [showUploadSection, setShowUploadSection] = useState(false);
   const [showPredictionSection, setShowPredictionSection] = useState(false);
+  const [showExportMenu, setShowExportMenu] = useState(false);
+  const [uploadType, setUploadType] = useState<'growth' | 'species'>('growth');
+  const [dataSource, setDataSource] = useState<'uploaded' | 'preset'>('uploaded');
   
   // 引用DOM元素
   const speciesChartRef = useRef<SVGSVGElement | null>(null);
@@ -67,7 +71,7 @@ export default function SpeciesAnalysis() {
     const fetchSpeciesData = async () => {
       try {
         console.log('开始获取物种数据...');
-        const response = await fetch('http://localhost:8080/api/species', {
+        const response = await fetch('http://localhost:8082/api/species', {
           method: 'GET',
           headers: {
             'Accept': 'application/json',
@@ -95,6 +99,62 @@ export default function SpeciesAnalysis() {
     fetchSpeciesData();
   }, []);
 
+  // 获取预设的鱼类体长时间数据
+  useEffect(() => {
+    const fetchPresetGrowthData = async () => {
+      try {
+        console.log('开始获取预设体长时间数据...');
+        // 首先尝试从API获取
+        const response = await fetch('http://localhost:8082/api/fish-growth/preset', {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          console.log('获取到的预设数据:', data);
+          setPresetData(data);
+        } else {
+          throw new Error('API获取失败');
+        }
+      } catch (err: any) {
+        console.log('API获取失败，使用本地示例数据');
+        // 如果API失败，使用本地示例数据
+        try {
+          const response = await fetch('/sample-fish-growth-data.csv');
+          const text = await response.text();
+          const lines = text.split('\n');
+          const data: FishGrowthData[] = [];
+
+          for (let i = 1; i < lines.length; i++) {
+            const line = lines[i].trim();
+            if (line) {
+              const [species_name, time_point, length] = line.split(',');
+              if (species_name && time_point && length) {
+                data.push({
+                  species_name: species_name.trim(),
+                  time_point: parseFloat(time_point.trim()),
+                  length: parseFloat(length.trim()),
+                  upload_date: new Date()
+                });
+              }
+            }
+          }
+          
+          console.log('加载本地示例数据:', data);
+          setPresetData(data);
+        } catch (localErr: any) {
+          console.error('加载本地示例数据失败:', localErr);
+        }
+      }
+    };
+
+    fetchPresetGrowthData();
+  }, []);
+
   // 获取所有唯一的物种名称
   const uniqueSpecies = Array.from(new Set(speciesData.map(s => s.species_name)));
 
@@ -117,15 +177,16 @@ export default function SpeciesAnalysis() {
 
     // 设置图表尺寸和边距
     const margin = { top: 40, right: 30, bottom: 60, left: 60 };
-    const containerWidth = speciesChartRef.current.clientWidth || 800;
+    const containerWidth = 800;
+    const containerHeight = 400;
     const width = containerWidth - margin.left - margin.right;
-    const height = 400 - margin.top - margin.bottom;
+    const height = containerHeight - margin.top - margin.bottom;
 
     // 创建SVG
     const svg = d3.select(speciesChartRef.current)
       .attr("width", "100%")
       .attr("height", "100%")
-      .attr("viewBox", `0 0 ${containerWidth} ${height + margin.top + margin.bottom}`)
+      .attr("viewBox", `0 0 ${containerWidth} ${containerHeight}`)
       .attr("preserveAspectRatio", "xMidYMid meet")
       .append("g")
       .attr("transform", `translate(${margin.left},${margin.top})`);
@@ -181,6 +242,17 @@ export default function SpeciesAnalysis() {
       .domain([0, d3.max(filteredData, d => d.weight / 30 + d.length1) || 0])
       .range([5, 15]);
 
+    // 添加交互提示
+    const tooltip = d3.select("body").append("div")
+      .attr("class", "tooltip")
+      .style("position", "absolute")
+      .style("visibility", "hidden")
+      .style("background-color", "rgba(0, 0, 0, 0.8)")
+      .style("color", "white")
+      .style("padding", "8px")
+      .style("border-radius", "4px")
+      .style("font-size", "12px");
+
     // 添加X轴
     svg.append("g")
       .attr("transform", `translate(0,${height})`)
@@ -216,7 +288,35 @@ export default function SpeciesAnalysis() {
       .attr("fill", d => colorScale(d.species_name))
       .attr("opacity", 0.6)
       .attr("stroke", "#fff")
-      .attr("stroke-width", 1);
+      .attr("stroke-width", 1)
+      .on("mouseover", function(event: any, d: any) {
+        const species = d as SpeciesData;
+        d3.select(this)
+          .transition()
+          .duration(200)
+          .attr("opacity", 1)
+          .attr("stroke-width", 2);
+
+        tooltip
+          .style("visibility", "visible")
+          .html(`
+            <div class="font-bold mb-1">${species.species_name}</div>
+            <div>体重: ${species.weight}g</div>
+            <div>体长: ${species.length1}cm</div>
+            <div>类别: ${species.category}</div>
+            <div>适宜温度: ${species.optimal_temp_range}</div>
+          `)
+          .style("left", (event.pageX + 10) + "px")
+          .style("top", (event.pageY - 28) + "px");
+      })
+      .on("mouseout", function() {
+        d3.select(this)
+          .transition()
+          .duration(200)
+          .attr("opacity", 0.6)
+          .attr("stroke-width", 1);
+        tooltip.style("visibility", "hidden");
+      });
 
     // 添加标题
     svg.append("text")
@@ -256,80 +356,44 @@ export default function SpeciesAnalysis() {
       .style("fill", "#4a5568")
       .text("体重 (g)");
 
-    // 添加图例
+    // 添加图例（水平分布在底部）
     const legend = svg.append("g")
       .attr("class", "legend")
-      .attr("transform", `translate(${width - 120}, 30)`);
+      .attr("transform", `translate(0, ${height + margin.bottom + 20})`);
 
     // 添加图例标题
     legend.append("text")
-      .attr("x", 0)
+      .attr("x", width / 2)
       .attr("y", -10)
+      .attr("text-anchor", "middle")
       .style("font-size", "12px")
       .style("font-weight", "bold")
       .style("fill", "#4a5568")
       .text("物种图例");
 
     const uniqueSpecies = Array.from(new Set(filteredData.map(d => d.species_name)));
+    const itemWidth = Math.min(120, width / uniqueSpecies.length);
+    const startX = (width - (uniqueSpecies.length * itemWidth)) / 2;
+    
     uniqueSpecies.forEach((species, i) => {
-      const legendRow = legend.append("g")
-        .attr("transform", `translate(0, ${i * 20})`);
+      const legendItem = legend.append("g")
+        .attr("transform", `translate(${startX + i * itemWidth}, 10)`);
 
-      legendRow.append("circle")
-        .attr("cx", 0)
+      legendItem.append("circle")
+        .attr("cx", 8)
         .attr("cy", 0)
         .attr("r", 6)
         .attr("fill", colorScale(species))
         .attr("opacity", 0.6);
 
-      legendRow.append("text")
-        .attr("x", 15)
+      legendItem.append("text")
+        .attr("x", 20)
         .attr("y", 4)
-        .style("font-size", "12px")
+        .style("font-size", "11px")
         .style("fill", "#4a5568")
         .text(species);
     });
 
-    // 添加交互提示
-    const tooltip = d3.select("body").append("div")
-      .attr("class", "tooltip")
-      .style("position", "absolute")
-      .style("visibility", "hidden")
-      .style("background-color", "rgba(0, 0, 0, 0.8)")
-      .style("color", "white")
-      .style("padding", "8px")
-      .style("border-radius", "4px")
-      .style("font-size", "12px");
-
-    svg.selectAll("circle")
-      .on("mouseover", function(event: any, d: any) {
-        const species = d as SpeciesData;
-        d3.select(this)
-          .transition()
-          .duration(200)
-          .attr("opacity", 1)
-          .attr("stroke-width", 2);
-
-        tooltip
-          .style("visibility", "visible")
-          .html(`
-            <div class="font-bold mb-1">${species.species_name}</div>
-            <div>体重: ${species.weight}g</div>
-            <div>体长: ${species.length1}cm</div>
-            <div>类别: ${species.category}</div>
-            <div>适宜温度: ${species.optimal_temp_range}</div>
-          `)
-          .style("left", (event.pageX + 10) + "px")
-          .style("top", (event.pageY - 28) + "px");
-      })
-      .on("mouseout", function() {
-        d3.select(this)
-          .transition()
-          .duration(200)
-          .attr("opacity", 0.6)
-          .attr("stroke-width", 1);
-        tooltip.style("visibility", "hidden");
-      });
   }, [speciesData, selectedSpecies, selectedLengthRange]); // 添加依赖项
 
   // 创建物种体长分布图
@@ -341,13 +405,17 @@ export default function SpeciesAnalysis() {
 
     // 设置图表尺寸和边距
     const margin = { top: 40, right: 30, bottom: 60, left: 60 };
-    const width = 800 - margin.left - margin.right;
-    const height = 400 - margin.top - margin.bottom;
+    const containerWidth = 800;
+    const containerHeight = 400;
+    const width = containerWidth - margin.left - margin.right;
+    const height = containerHeight - margin.top - margin.bottom;
 
     // 创建SVG
     const svg = d3.select(speciesLengthChartRef.current)
-      .attr("width", width + margin.left + margin.right)
-      .attr("height", height + margin.top + margin.bottom)
+      .attr("width", "100%")
+      .attr("height", "100%")
+      .attr("viewBox", `0 0 ${containerWidth} ${containerHeight}`)
+      .attr("preserveAspectRatio", "xMidYMid meet")
       .append("g")
       .attr("transform", `translate(${margin.left},${margin.top})`);
 
@@ -424,9 +492,12 @@ export default function SpeciesAnalysis() {
       .attr("y", d => y(d.length1))
       .attr("height", d => height - y(d.length1));
 
-    // 添加数值标签
+    // 添加数值标签（只显示最大值）
+    const maxLength = d3.max(speciesData, d => d.length1) || 0;
+    const maxLengthData = speciesData.filter(d => d.length1 === maxLength);
+    
     svg.selectAll(".label")
-      .data(speciesData)
+      .data(maxLengthData)
       .enter()
       .append("text")
       .attr("class", "label")
@@ -435,6 +506,7 @@ export default function SpeciesAnalysis() {
       .attr("text-anchor", "middle")
       .style("font-size", "12px")
       .style("fill", "#666")
+      .style("font-weight", "bold")
       .text(d => `${d.length1}cm`);
 
     // 添加标题
@@ -456,13 +528,17 @@ export default function SpeciesAnalysis() {
 
     // 设置图表尺寸和边距
     const margin = { top: 40, right: 30, bottom: 60, left: 60 };
-    const width = 800 - margin.left - margin.right;
-    const height = 400 - margin.top - margin.bottom;
+    const containerWidth = 800;
+    const containerHeight = 400;
+    const width = containerWidth - margin.left - margin.right;
+    const height = containerHeight - margin.top - margin.bottom;
 
     // 创建SVG
     const svg = d3.select(predictionChartRef.current)
-      .attr("width", width + margin.left + margin.right)
-      .attr("height", height + margin.top + margin.bottom)
+      .attr("width", "100%")
+      .attr("height", "100%")
+      .attr("viewBox", `0 0 ${containerWidth} ${containerHeight}`)
+      .attr("preserveAspectRatio", "xMidYMid meet")
       .append("g")
       .attr("transform", `translate(${margin.left},${margin.top})`);
 
@@ -613,38 +689,113 @@ export default function SpeciesAnalysis() {
     })
     .slice(0, showAllSpecies ? undefined : 5);
 
-  // 添加导出CSV功能
+  // 增强的导出功能
   const exportToCSV = () => {
-    // 准备CSV数据
-    const headers = ['物种名称', '类别', '体重(g)', '体长(cm)', '适宜温度范围'];
+    // 准备完整的CSV数据，包含所有字段
+    const headers = [
+      '物种ID', '物种名称', '学名', '类别', '体重(g)', 
+      '体长1(cm)', '体长2(cm)', '体长3(cm)', '高度(cm)', '宽度(cm)', '适宜温度范围'
+    ];
+    
     const csvData = filteredSpeciesData.map(species => [
-      species.species_name,
-      species.category,
-      species.weight,
-      species.length1,
-      species.optimal_temp_range
+      species.species_id || '',
+      species.species_name || '',
+      species.scientific_name || '',
+      species.category || '',
+      species.weight || '',
+      species.length1 || '',
+      species.length2 || '',
+      species.length3 || '',
+      species.height || '',
+      species.width || '',
+      species.optimal_temp_range || ''
     ]);
 
     // 创建CSV内容
     const csvContent = [
       headers.join(','),
-      ...csvData.map(row => row.join(','))
+      ...csvData.map(row => row.map(cell => 
+        // 处理包含逗号的字段，用双引号包围
+        typeof cell === 'string' && cell.includes(',') ? `"${cell}"` : cell
+      ).join(','))
     ].join('\n');
 
-    // 创建Blob对象
-    const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
+    downloadFile(csvContent, 'csv', '物种详细数据');
+  };
 
-    // 创建下载链接
+  // 导出JSON格式
+  const exportToJSON = () => {
+    const jsonContent = JSON.stringify(filteredSpeciesData, null, 2);
+    downloadFile(jsonContent, 'json', '物种详细数据');
+  };
+
+  // 导出Excel格式（实际上是CSV，但可以被Excel打开）
+  const exportToExcel = () => {
+    const headers = [
+      '物种ID', '物种名称', '学名', '类别', '体重(g)', 
+      '体长1(cm)', '体长2(cm)', '体长3(cm)', '高度(cm)', '宽度(cm)', '适宜温度范围'
+    ];
+    
+    const csvData = filteredSpeciesData.map(species => [
+      species.species_id || '',
+      species.species_name || '',
+      species.scientific_name || '',
+      species.category || '',
+      species.weight || '',
+      species.length1 || '',
+      species.length2 || '',
+      species.length3 || '',
+      species.height || '',
+      species.width || '',
+      species.optimal_temp_range || ''
+    ]);
+
+    const csvContent = [
+      headers.join(','),
+      ...csvData.map(row => row.map(cell => 
+        typeof cell === 'string' && cell.includes(',') ? `"${cell}"` : cell
+      ).join(','))
+    ].join('\n');
+
+    downloadFile(csvContent, 'xlsx', '物种详细数据');
+  };
+
+  // 通用下载函数
+  const downloadFile = (content: string, format: string, baseName: string) => {
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+    const filename = `${baseName}_${timestamp}.${format}`;
+    
+    let mimeType = 'text/plain';
+    let processedContent = content;
+    
+    switch (format) {
+      case 'csv':
+      case 'xlsx':
+        mimeType = 'text/csv;charset=utf-8;';
+        processedContent = '\ufeff' + content; // 添加BOM以支持中文
+        break;
+      case 'json':
+        mimeType = 'application/json;charset=utf-8;';
+        break;
+    }
+    
+    const blob = new Blob([processedContent], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    
     const link = document.createElement('a');
     link.setAttribute('href', url);
-    link.setAttribute('download', `物种数据_${new Date().toLocaleDateString()}.csv`);
+    link.setAttribute('download', filename);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    
+    URL.revokeObjectURL(url);
+    setShowExportMenu(false);
+    
+    console.log(`已导出 ${filteredSpeciesData.length} 条物种数据到文件: ${filename}`);
   };
 
-  // 处理文件上传
+  // 处理鱼类体长-时间数据文件上传
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -694,50 +845,140 @@ export default function SpeciesAnalysis() {
     }
   };
 
+  // 处理物种数据文件上传
+  const handleSpeciesUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setUploadLoading(true);
+    try {
+      const text = await file.text();
+      const lines = text.split('\n');
+      const data: SpeciesData[] = [];
+
+      // 解析CSV文件（格式：species_id,species_name,scientific_name,category,weight,length1,length2,length3,height,width,optimal_temp_range）
+      for (let i = 1; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (line) {
+          const columns = line.split(',');
+          if (columns.length >= 11) {
+            const [species_id, species_name, scientific_name, category, weight, length1, length2, length3, height, width, optimal_temp_range] = columns;
+            if (species_name && weight && length1) {
+              data.push({
+                species_id: species_id.trim(),
+                species_name: species_name.trim(),
+                scientific_name: scientific_name.trim() === 'NULL' ? '' : scientific_name.trim(),
+                category: category.trim(),
+                weight: parseFloat(weight.trim()),
+                length1: parseFloat(length1.trim()),
+                length2: parseFloat(length2.trim()),
+                length3: parseFloat(length3.trim()),
+                height: parseFloat(height.trim()),
+                width: parseFloat(width.trim()),
+                optimal_temp_range: optimal_temp_range.trim()
+              });
+            }
+          }
+        }
+      }
+
+      // 保存到数据库
+      const response = await fetch('http://localhost:8082/api/species', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+      });
+
+      if (response.ok) {
+        alert(`成功上传 ${data.length} 条物种数据！`);
+        // 重新获取物种数据以更新页面
+        window.location.reload();
+      } else {
+        throw new Error('上传失败');
+      }
+    } catch (error) {
+      console.error('物种数据上传错误:', error);
+      alert('物种数据上传失败，请检查文件格式');
+    } finally {
+      setUploadLoading(false);
+    }
+  };
+
   // 执行体长预测
   const performGrowthPrediction = async () => {
-    if (uploadedData.length === 0) {
-      alert('请先上传数据');
+    const currentData = dataSource === 'uploaded' ? uploadedData : presetData;
+    
+    if (currentData.length === 0) {
+      alert(dataSource === 'uploaded' ? '请先上传数据' : '暂无预设数据');
       return;
     }
 
     setPredictionLoading(true);
     try {
-      // 简单的线性回归预测模型
-      const speciesData = uploadedData.filter(d => d.species_name === selectedUploadSpecies);
-      if (speciesData.length < 2) {
-        alert('数据点不足，无法进行预测');
+      const speciesData = currentData.filter(d => d.species_name === selectedUploadSpecies);
+      if (speciesData.length < 3) {
+        alert('数据点不足，至少需要3个数据点进行建模分析');
         return;
       }
 
-      // 计算线性回归参数
-      const n = speciesData.length;
-      const sumX = speciesData.reduce((sum, d) => sum + d.time_point, 0);
-      const sumY = speciesData.reduce((sum, d) => sum + d.length, 0);
-      const sumXY = speciesData.reduce((sum, d) => sum + d.time_point * d.length, 0);
-      const sumXX = speciesData.reduce((sum, d) => sum + d.time_point * d.time_point, 0);
+      // 动态导入建模模块
+      const { performComprehensiveModeling, generateModelingChart, generateModelingReport } = await import('./modeling');
+      
+      // 执行综合建模分析
+      const modelingReport = performComprehensiveModeling(speciesData);
+      
+      // 设置预测结果
+      setPredictionResults(modelingReport.bestModel.predictions);
+      
+      // 生成并下载建模分析图
+      const chartSvg = generateModelingChart(modelingReport, speciesData);
+      const chartBlob = new Blob([chartSvg], { type: 'image/svg+xml' });
+      const chartUrl = URL.createObjectURL(chartBlob);
+      const chartLink = document.createElement('a');
+      chartLink.href = chartUrl;
+      chartLink.download = `${selectedUploadSpecies}_modeling_chart_${getTimestamp()}.svg`;
+      chartLink.click();
+      URL.revokeObjectURL(chartUrl);
+      
+      // 生成并下载建模报告
+      const reportHtml = generateModelingReport(modelingReport, speciesData, selectedUploadSpecies);
+      const reportBlob = new Blob([reportHtml], { type: 'text/html' });
+      const reportUrl = URL.createObjectURL(reportBlob);
+      const reportLink = document.createElement('a');
+      reportLink.href = reportUrl;
+      reportLink.download = `${selectedUploadSpecies}_modeling_report_${getTimestamp()}.html`;
+      reportLink.click();
+      URL.revokeObjectURL(reportUrl);
+      
+      // 显示建模结果分析
+      const analysisText = `
+建模分析完成！
 
-      const slope = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX);
-      const intercept = (sumY - slope * sumX) / n;
+最佳模型: ${modelingReport.bestModel.name}
+拟合度: ${(modelingReport.bestModel.r_squared * 100).toFixed(1)}%
+模型方程: ${modelingReport.bestModel.equation}
 
-      // 生成预测数据
-      const maxTime = Math.max(...speciesData.map(d => d.time_point));
-      const predictions: GrowthPrediction[] = [];
+分析结果:
+${modelingReport.bestModel.analysis}
 
-      for (let t = maxTime + 1; t <= maxTime + 30; t++) {
-        const predictedLength = slope * t + intercept;
-        predictions.push({
-          time_point: t,
-          predicted_length: Math.max(0, predictedLength), // 确保预测值不为负
-          confidence_interval: [predictedLength * 0.9, predictedLength * 1.1]
-        });
-      }
+数据质量评估:
+• 样本数量: ${modelingReport.dataQuality.sampleSize} 个
+• 时间跨度: ${modelingReport.dataQuality.timeSpan.toFixed(1)} 天
+• 平均增长率: ${modelingReport.dataQuality.growthRate.toFixed(3)} cm/天
+• 变异系数: ${(modelingReport.dataQuality.variability * 100).toFixed(1)}%
 
-      setPredictionResults(predictions);
-      alert('预测完成！');
+建议:
+${modelingReport.recommendations.join('\n')}
+
+建模分析图和详细报告已自动下载！
+      `;
+      
+      alert(analysisText);
     } catch (error) {
-      console.error('预测失败:', error);
-      alert('预测失败，请重试');
+      console.error('建模分析失败:', error);
+      alert('建模分析失败，请重试: ' + (error as Error).message);
     } finally {
       setPredictionLoading(false);
     }
@@ -789,7 +1030,7 @@ export default function SpeciesAnalysis() {
                 <h3 className="text-lg font-semibold">数据上传</h3>
                 <button
                   onClick={() => setShowUploadSection(!showUploadSection)}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  className="px-4 py-2 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors"
                 >
                   <FaUpload className="inline mr-1" />
                   {showUploadSection ? '收起' : '展开'}
@@ -798,21 +1039,70 @@ export default function SpeciesAnalysis() {
               
               {showUploadSection && (
                 <div>
+                  {/* 上传类型选择 */}
                   <div className="mb-4">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      上传鱼类体长-时间数据 (CSV格式)
-                    </label>
-                    <input
-                      type="file"
-                      accept=".csv"
-                      onChange={handleFileUpload}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      disabled={uploadLoading}
-                    />
-                    <p className="text-xs text-gray-500 mt-1">
-                      文件格式：species_name,time_point,length
-                    </p>
+                    <div className="flex space-x-1 bg-gray-100 p-1 rounded-lg">
+                      <button
+                        onClick={() => setUploadType('growth')}
+                        className={`flex-1 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                          uploadType === 'growth'
+                            ? 'bg-white text-blue-600 shadow-sm'
+                            : 'text-gray-500 hover:text-gray-700'
+                        }`}
+                      >
+                        体长-时间数据
+                      </button>
+                      <button
+                        onClick={() => setUploadType('species')}
+                        className={`flex-1 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                          uploadType === 'species'
+                            ? 'bg-white text-blue-600 shadow-sm'
+                            : 'text-gray-500 hover:text-gray-700'
+                        }`}
+                      >
+                        物种数据
+                      </button>
+                    </div>
                   </div>
+
+                  {/* 体长-时间数据上传 */}
+                  {uploadType === 'growth' && (
+                    <div className="mb-4">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        上传鱼类体长-时间数据 (CSV格式)
+                      </label>
+                      <input
+                        type="file"
+                        accept=".csv"
+                        onChange={handleFileUpload}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        disabled={uploadLoading}
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        文件格式：species_name,time_point,length
+                      </p>
+                    </div>
+                  )}
+
+                  {/* 物种数据上传 */}
+                  {uploadType === 'species' && (
+                    <div className="mb-4">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        上传物种数据 (CSV格式)
+                      </label>
+                      <input
+                        type="file"
+                        accept=".csv"
+                        onChange={handleSpeciesUpload}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        disabled={uploadLoading}
+                      />
+                      <div className="text-xs text-gray-500 mt-1">
+                        <p className="mb-1">文件格式：species_id,species_name,scientific_name,category,weight,length1,length2,length3,height,width,optimal_temp_range</p>
+                        <p className="text-blue-600">示例：1,Bream,NULL,Freshwater,242.0,23.2,25.4,30.0,11.5200,4.0200,15-25</p>
+                      </div>
+                    </div>
+                  )}
                   
                   {uploadLoading && (
                     <div className="text-center py-4">
@@ -849,7 +1139,7 @@ export default function SpeciesAnalysis() {
                 <h3 className="text-lg font-semibold">体长预测</h3>
                 <button
                   onClick={() => setShowPredictionSection(!showPredictionSection)}
-                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                  className="px-4 py-2 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors"
                 >
                   <FaChartLine className="inline mr-1" />
                   {showPredictionSection ? '收起' : '展开'}
@@ -858,6 +1148,41 @@ export default function SpeciesAnalysis() {
               
               {showPredictionSection && (
                 <div>
+                  {/* 数据源选择 */}
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      选择数据源
+                    </label>
+                    <div className="flex space-x-1 bg-gray-100 p-1 rounded-lg">
+                      <button
+                         onClick={() => {
+                           setDataSource('uploaded');
+                           setSelectedUploadSpecies('');
+                         }}
+                         className={`flex-1 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                           dataSource === 'uploaded'
+                             ? 'bg-white text-blue-600 shadow-sm'
+                             : 'text-gray-500 hover:text-gray-700'
+                         }`}
+                       >
+                         上传数据
+                       </button>
+                       <button
+                         onClick={() => {
+                           setDataSource('preset');
+                           setSelectedUploadSpecies('');
+                         }}
+                         className={`flex-1 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                           dataSource === 'preset'
+                             ? 'bg-white text-blue-600 shadow-sm'
+                             : 'text-gray-500 hover:text-gray-700'
+                         }`}
+                       >
+                         预设数据
+                       </button>
+                    </div>
+                  </div>
+
                   <div className="mb-4">
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       选择预测物种
@@ -866,13 +1191,24 @@ export default function SpeciesAnalysis() {
                       value={selectedUploadSpecies}
                       onChange={(e) => setSelectedUploadSpecies(e.target.value)}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      disabled={uploadedData.length === 0}
+                      disabled={(dataSource === 'uploaded' && uploadedData.length === 0) || (dataSource === 'preset' && presetData.length === 0)}
                     >
                       <option value="">请选择物种</option>
-                      {Array.from(new Set(uploadedData.map(d => d.species_name))).map(species => (
-                        <option key={species} value={species}>{species}</option>
-                      ))}
+                      {dataSource === 'uploaded' 
+                        ? Array.from(new Set(uploadedData.map(d => d.species_name))).map(species => (
+                            <option key={species} value={species}>{species}</option>
+                          ))
+                        : Array.from(new Set(presetData.map(d => d.species_name))).map(species => (
+                            <option key={species} value={species}>{species}</option>
+                          ))
+                      }
                     </select>
+                    {dataSource === 'uploaded' && uploadedData.length === 0 && (
+                      <p className="text-sm text-gray-500 mt-1">请先上传体长-时间数据</p>
+                    )}
+                    {dataSource === 'preset' && presetData.length === 0 && (
+                      <p className="text-sm text-gray-500 mt-1">暂无预设数据</p>
+                    )}
                   </div>
                   
                   <div className="flex gap-3">
@@ -884,12 +1220,12 @@ export default function SpeciesAnalysis() {
                       {predictionLoading ? (
                         <>
                           <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white inline-block mr-2"></div>
-                          预测中...
+                          建模分析中...
                         </>
                       ) : (
                         <>
                           <FaChartLine className="inline mr-1" />
-                          开始预测
+                          数学建模分析
                         </>
                       )}
                     </button>
@@ -898,26 +1234,26 @@ export default function SpeciesAnalysis() {
                       <button
                         onClick={() => {
                           const csvData = predictionResults.map(p => 
-                            `${p.time_point},${p.predicted_length.toFixed(2)}`
+                            `${p.time_point},${p.predicted_length.toFixed(2)},${p.confidence_interval?.[0]?.toFixed(2) || 'N/A'},${p.confidence_interval?.[1]?.toFixed(2) || 'N/A'}`
                           ).join('\n');
-                          const blob = new Blob(['time_point,predicted_length\n' + csvData], { type: 'text/csv' });
+                          const blob = new Blob(['time_point,predicted_length,confidence_lower,confidence_upper\n' + csvData], { type: 'text/csv' });
                           const url = URL.createObjectURL(blob);
                           const link = document.createElement('a');
                           link.href = url;
-                          link.download = `${selectedUploadSpecies}_prediction_${getTimestamp()}.csv`;
+                          link.download = `${selectedUploadSpecies}_modeling_predictions_${getTimestamp()}.csv`;
                           link.click();
                         }}
                         className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                       >
                         <FaDownload className="inline mr-1" />
-                        导出结果
+                        导出预测数据
                       </button>
                     )}
                   </div>
 
                   {predictionResults.length > 0 && (
                     <div>
-                      <h4 className="font-medium mb-4">预测结果图表</h4>
+                      <h4 className="font-medium mb-4">建模分析结果图表</h4>
                       <div className="h-[400px] relative">
                         <svg 
                           ref={predictionChartRef} 
@@ -926,11 +1262,11 @@ export default function SpeciesAnalysis() {
                         ></svg>
                       </div>
                       <div className="mt-4 bg-gray-50 p-4 rounded-lg">
-                        <h5 className="font-medium mb-2">预测统计信息</h5>
+                        <h5 className="font-medium mb-2">建模统计信息</h5>
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                           <div>
-                            <span className="text-gray-600">数据点数：</span>
-                            <span className="font-medium">{uploadedData.filter(d => d.species_name === selectedUploadSpecies).length}</span>
+                            <span className="text-gray-600">训练数据点：</span>
+                            <span className="font-medium">{(dataSource === 'uploaded' ? uploadedData : presetData).filter(d => d.species_name === selectedUploadSpecies).length}</span>
                           </div>
                           <div>
                             <span className="text-gray-600">预测点数：</span>
@@ -944,6 +1280,10 @@ export default function SpeciesAnalysis() {
                             <span className="text-gray-600">预测时间范围：</span>
                             <span className="font-medium">{Math.max(...predictionResults.map(p => p.time_point))} 天</span>
                           </div>
+                        </div>
+                        <div className="mt-3 text-sm text-gray-600">
+                          <p>💡 建模分析图表和详细报告已自动下载到您的下载文件夹</p>
+                          <p>📊 图表包含多种数学模型的比较分析和最佳拟合结果</p>
                         </div>
                       </div>
                     </div>
@@ -996,13 +1336,9 @@ export default function SpeciesAnalysis() {
                 </div>
               </div>
               
-              <button
-                onClick={exportToCSV}
-                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-              >
-                <FaFileExport className="inline mr-1" />
-                导出CSV
-              </button>
+              <div className="text-sm text-gray-500">
+                数据导出功能已移至下方表格右上角
+              </div>
             </div>
           </div>
 
@@ -1013,7 +1349,7 @@ export default function SpeciesAnalysis() {
                 <h2 className="text-xl font-semibold">物种体长-体重关系</h2>
                 <button
                   onClick={() => downloadD3Chart(speciesChartRef, '物种体长体重关系图')}
-                  className="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 transition-colors"
+                  className="px-3 py-1 bg-black text-white rounded text-sm hover:bg-blue-700 transition-colors"
                 >
                   <FaDownload className="inline mr-1" />
                   下载
@@ -1033,7 +1369,7 @@ export default function SpeciesAnalysis() {
                 <h2 className="text-xl font-semibold">物种体长分布</h2>
                 <button
                   onClick={() => downloadD3Chart(speciesLengthChartRef, '物种体长分布图')}
-                  className="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 transition-colors"
+                  className="px-3 py-1 bg-black text-white rounded text-sm hover:bg-blue-700 transition-colors"
                 >
                   <FaDownload className="inline mr-1" />
                   下载
@@ -1060,13 +1396,78 @@ export default function SpeciesAnalysis() {
                 >
                   {showAllSpecies ? '显示前5条' : '显示全部'}
                 </button>
-                <button
-                  onClick={exportToCSV}
-                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                >
-                  <FaFileExport className="inline mr-1" />
-                  导出数据
-                </button>
+                {/* 增强的导出模块 */}
+                <div className="relative">
+                  <button
+                    onClick={() => setShowExportMenu(!showExportMenu)}
+                    className="px-4 py-2 bg-black text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2"
+                    title="导出物种详细数据"
+                  >
+                    <FaFileExport className="text-sm" />
+                    导出数据
+                    <FaCaretDown className={`text-xs transition-transform ${showExportMenu ? 'rotate-180' : ''}`} />
+                  </button>
+                  
+                  {/* 导出选项菜单 */}
+                  {showExportMenu && (
+                    <div className="absolute right-0 top-full mt-2 w-56 bg-white border border-gray-200 rounded-lg shadow-lg z-20">
+                      <div className="p-2">
+                        <div className="text-xs text-gray-500 px-2 py-1 border-b border-gray-100 mb-1">
+                          导出格式选择 ({filteredSpeciesData.length} 条记录)
+                        </div>
+                        
+                        <button
+                          onClick={exportToCSV}
+                          className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 rounded flex items-center gap-2"
+                        >
+                          <FaFileExport className="text-green-600" />
+                          <div>
+                            <div className="font-medium">CSV 格式</div>
+                            <div className="text-xs text-gray-500">适合Excel打开，包含所有字段</div>
+                          </div>
+                        </button>
+                        
+                        <button
+                          onClick={exportToJSON}
+                          className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 rounded flex items-center gap-2"
+                        >
+                          <FaFileExport className="text-blue-600" />
+                          <div>
+                            <div className="font-medium">JSON 格式</div>
+                            <div className="text-xs text-gray-500">适合程序处理，保持数据结构</div>
+                          </div>
+                        </button>
+                        
+                        <button
+                          onClick={exportToExcel}
+                          className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 rounded flex items-center gap-2"
+                        >
+                          <FaFileExport className="text-orange-600" />
+                          <div>
+                            <div className="font-medium">Excel 格式</div>
+                            <div className="text-xs text-gray-500">优化的Excel兼容格式</div>
+                          </div>
+                        </button>
+                        
+                        <div className="border-t border-gray-100 mt-2 pt-2">
+                          <div className="text-xs text-gray-400 px-2">
+                            • 文件名包含时间戳<br/>
+                            • 支持中文字符<br/>
+                            • 包含完整物种信息
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* 点击外部关闭菜单 */}
+                  {showExportMenu && (
+                    <div 
+                      className="fixed inset-0 z-10" 
+                      onClick={() => setShowExportMenu(false)}
+                    ></div>
+                  )}
+                </div>
               </div>
             </div>
             
