@@ -341,7 +341,7 @@ const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => 
     formData.append('image', file);
 
     // 直接调用 Go 后端 API
-    const response = await fetch('http://localhost:8080/api/fish-recognition', {
+    const response = await fetch('http://localhost:8082/api/fish-recognition', {
       method: 'POST',
       body: formData
     });

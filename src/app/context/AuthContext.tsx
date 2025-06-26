@@ -45,30 +45,51 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 console.log("AuthProvider: 从localStorage获取用户信息", storedUser);
                 if (storedUser) {
                     const userData = JSON.parse(storedUser);
-                    // 验证会话是否有效
-                    const response = await fetch('/api/auth/validate', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({ userId: userData.id }),
-                    });
-
-                    if (response.ok) {
-                        console.log("AuthProvider: 会话验证成功，设置用户信息");
-                        setUser(userData);
-                    } else {
-                        console.log("AuthProvider: 会话验证失败，清除用户信息");
-                        localStorage.removeItem('user');
-                        setUser(null);
-                    }
+                    // 暂停会话验证 - 直接使用本地存储的用户信息
+                    console.log("AuthProvider: 跳过会话验证，直接使用本地用户信息");
+                    setUser(userData);
+                    
+                    // 原始验证逻辑已暂停
+                    // const response = await fetch('/api/auth/validate', {
+                    //     method: 'POST',
+                    //     headers: {
+                    //         'Content-Type': 'application/json',
+                    //     },
+                    //     body: JSON.stringify({ userId: userData.id }),
+                    // });
+                    //
+                    // if (response.ok) {
+                    //     console.log("AuthProvider: 会话验证成功，设置用户信息");
+                    //     setUser(userData);
+                    // } else {
+                    //     console.log("AuthProvider: 会话验证失败，清除用户信息");
+                    //     localStorage.removeItem('user');
+                    //     setUser(null);
+                    // }
                 } else {
                     console.log("AuthProvider: 未找到存储的用户信息");
+                    // 暂停验证期间，如果没有本地用户信息，设置默认管理员用户
+                    const defaultUser = {
+                        id: 'temp-admin',
+                        username: 'temp-admin',
+                        role: 'admin',
+                        email: 'admin@temp.com'
+                    };
+                    console.log("AuthProvider: 设置临时管理员用户");
+                    setUser(defaultUser);
+                    localStorage.setItem('user', JSON.stringify(defaultUser));
                 }
             } catch (error) {
                 console.error('AuthProvider: 会话验证失败:', error);
-                localStorage.removeItem('user');
-                setUser(null);
+                // 暂停验证期间，即使出错也设置默认用户
+                const defaultUser = {
+                    id: 'temp-admin',
+                    username: 'temp-admin', 
+                    role: 'admin',
+                    email: 'admin@temp.com'
+                };
+                setUser(defaultUser);
+                localStorage.setItem('user', JSON.stringify(defaultUser));
             } finally {
                 setIsLoading(false);
                 console.log("AuthProvider: 会话验证完成", { user, isLoading });
@@ -172,4 +193,4 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             {children}
         </AuthContext.Provider>
     );
-} 
+}

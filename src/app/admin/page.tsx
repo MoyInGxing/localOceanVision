@@ -27,17 +27,24 @@ export default function AdminDashboard() {
   const fetchUsers = async () => {
     try {
       const token = localStorage.getItem('token');
-      if (!token) {
-        throw new Error('未找到认证token');
-      }
+      // 暂停token验证 - 允许无token访问
+      // if (!token) {
+      //   throw new Error('未找到认证token');
+      // }
 
-      console.log('正在获取用户列表，使用token:', token);
+      console.log('正在获取用户列表，使用token:', token || '无token');
       
-      const response = await fetch('http://localhost:8080/api/admin/users', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      
+      // 如果有token则添加Authorization头
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      
+      const response = await fetch('http://localhost:8082/api/admin/users', {
+        headers,
       });
 
       console.log('服务器响应状态:', response.status);
@@ -59,18 +66,25 @@ export default function AdminDashboard() {
     }
   };
 
-  if (!user || user.role !== 'admin') {
-    router.push('/login');
-    return null;
-  }
+  // 暂停用户登录验证
+  // if (!user || user.role !== 'admin') {
+  //   router.push('/login');
+  //   return null;
+  // }
 
   const handleDeleteUser = async (userId: string) => {
     try {
-      const response = await fetch(`http://localhost:8080/api/admin/users/${userId}`, {
+      const token = localStorage.getItem('token');
+      const headers: Record<string, string> = {};
+      
+      // 如果有token则添加Authorization头
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      
+      const response = await fetch(`http://localhost:8082/api/admin/users/${userId}`, {
         method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-        },
+        headers,
       });
       if (!response.ok) {
         throw new Error('删除用户失败');
@@ -84,12 +98,19 @@ export default function AdminDashboard() {
 
   const handleRoleChange = async (userId: string, newRole: string) => {
     try {
-      const response = await fetch(`http://localhost:8080/api/admin/users/${userId}/role`, {
+      const token = localStorage.getItem('token');
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      
+      // 如果有token则添加Authorization头
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      
+      const response = await fetch(`http://localhost:8082/api/admin/users/${userId}/role`, {
         method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-          'Content-Type': 'application/json',
-        },
+        headers,
         body: JSON.stringify({ role: newRole }),
       });
       if (!response.ok) {
@@ -234,4 +255,4 @@ export default function AdminDashboard() {
       </div>
     </div>
   );
-} 
+}

@@ -26,18 +26,21 @@ func main() {
 	userRepo := database.NewGORMUserRepository(db)
 	sessionRepo := database.NewGORMSessionRepository(db)
 	speciesRepo := database.NewGORMSpeciesRepository(db)
+	waterQualityRepo := database.NewGORMWaterQualityRepository(db)
 
 	userService := app.NewUserService(userRepo)
 	authService := app.NewAuthService(userRepo, sessionRepo, cfg)
 	speciesService := app.NewSpeciesService(speciesRepo)
+	waterQualityService := app.NewWaterQualityService(waterQualityRepo)
 
 	userHandler := handler.NewUserHandler(userService, authService)
 	speciesHandler := handler.NewSpeciesHandler(speciesService)
+	waterQualityHandler := handler.NewWaterQualityHandler(waterQualityService)
 	fishRecognitionHandler := handler.FishRecognitionHandler // 创建处理器
 	authMiddleware := middleware.NewAuthMiddleware(authService)
 	adminAuthMiddleware := middleware.NewAdminAuthMiddleware(authService)
 
-	r := myrouter.SetupRouter(userHandler, speciesHandler, fishRecognitionHandler, authMiddleware, adminAuthMiddleware)
+	r := myrouter.SetupRouter(userHandler, speciesHandler, waterQualityHandler, fishRecognitionHandler, authMiddleware, adminAuthMiddleware)
 
 	// 添加这段调试代码
 	fmt.Println("=== 注册的路由 ===")
@@ -46,7 +49,7 @@ func main() {
 	}
 	fmt.Println("================")
 
-	if err := r.Run(":8080"); err != nil {
+	if err := r.Run(":8082"); err != nil {
 		log.Fatalf("Failed to run server: %v", err)
 	}
 }

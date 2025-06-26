@@ -10,7 +10,7 @@ const nextConfig = {
     return [
       {
         source: '/api/:path*',
-        destination: 'http://localhost:8080/api/:path*', // 代理到后端服务
+        destination: 'http://localhost:8082/api/:path*', // 代理到后端服务
       },
     ]
   },

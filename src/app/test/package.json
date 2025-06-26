@@ -1,0 +1,23 @@
+{
+  "name": "oceanvision-api-test",
+  "version": "1.0.0",
+  "description": "API测试工具 - 用于诊断OceanVision监测点API调用问题",
+  "main": "api-test.js",
+  "scripts": {
+    "test": "node api-test.js",
+    "test-monitoring": "node api-test.js",
+    "install-deps": "npm install node-fetch"
+  },
+  "dependencies": {
+    "node-fetch": "^2.6.7"
+  },
+  "keywords": [
+    "api",
+    "test",
+    "oceanvision",
+    "monitoring",
+    "water-quality"
+  ],
+  "author": "OceanVision Team",
+  "license": "MIT"
+}

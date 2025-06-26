@@ -30,7 +30,7 @@ export default function SpeciesPage() {
     const fetchData = async () => {
       try {
         console.log('开始获取物种数据...');
-        const response = await fetch('http://localhost:8080/api/species', {
+        const response = await fetch('http://localhost:8082/api/species', {
           method: 'GET',
           headers: {
             'Accept': 'application/json',

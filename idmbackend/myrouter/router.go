@@ -58,10 +58,10 @@ func SetupRouter(
 			species.GET("", speciesHandler.GetAllSpecies)
 		}
 
-		// Species routes
-		species := api.Group("/species")
+		// Database routes
+		database := api.Group("/database")
 		{
-			species.GET("", speciesHandler.GetAllSpecies)
+			database.GET("/schema", speciesHandler.ExportDatabaseSchema)
 		}
 
 		// Admin protected routes
